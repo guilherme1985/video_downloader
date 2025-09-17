@@ -9,6 +9,7 @@ import json
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 
+# Pasta padrão de download
 DEFAULT_PATH = "/mnt/nas/Downloads"
 
 # Variável global para armazenar o status do download

@@ -7,7 +7,7 @@ Uma aplicação Dockerizada para download de vídeos de plataformas como YouTube
 - Docker
 - Docker Compose
 
-## 🚀 Como usar
+## Como usar
 
 ### 1. Iniciar a aplicação
 
@@ -33,7 +33,7 @@ Caso tenha alterações no container:
 docker-compose pull
 ```
 
-## 🔧 Configuração de permissões do Docker (se necessário)
+## Configuração de permissões do Docker (se necessário)
 
 Se você encontrar problemas de permissão, execute os comandos abaixo:
 
@@ -49,11 +49,11 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-## 🖥️ Interface
+## Interface
 
 ![Interface da aplicação](front.png)
 
-## ⚡ Funcionalidades
+## Funcionalidades
 
 A aplicação funciona com qualquer site que siga as mesmas regras do YouTube.
 
@@ -70,8 +70,19 @@ A aplicação funciona com qualquer site que siga as mesmas regras do YouTube.
 - O arquivo deve conter apenas um tipo de link (direto ou playlist)
 - Cada link deve estar em uma linha separada
 
-## 📝 Observações
+## Customização
+- No *app.py* voce customizar o caminho padrão de salvamento
+```bash
+DEFAULT_PATH = "/mnt/nas/Downloads"
+```
+    -  Ajuste tambem no *download_videos.py*
+```bash
+download_path = sys.argv[2] if len(sys.argv) > 2 else "/mnt/nas/Downloads"
+```
+
+## Observações
 
 - Certifique-se de que os links sejam válidos e acessíveis
+- Verifique se o firewall ou antivirus nãoe esta bloqueando a porta usanda (padrão: 5000)
 - Para playlists, todos os vídeos serão baixados sequencialmente
 - Os downloads são salvos no diretório informado
