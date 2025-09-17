@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Downloader</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 2rem;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            padding: 0.5rem 2rem;
+        }
+        h1 {
+            color: #0d6efd;
+            margin-bottom: 1.5rem;
+        }
+        .alert {
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Video Downloader</h1>
+        
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-info">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        
+        <form method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label class="form-label">Arquivo .txt com links:</label>
+                <input type="file" class="form-control" name="file">
+                <small class="form-text text-muted">Selecione um arquivo .txt contendo um link por linha</small>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Ou cole os links (um por linha):</label>
+                <textarea name="links" class="form-control" rows="8" placeholder="https://www.youtube.com/watch?v=exemplo1&#10;https://www.youtube.com/watch?v=exemplo2"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Pasta de destino:</label>
+                <input type="text" class="form-control" name="dest_path" value="{{ default_path }}">
+                <small class="form-text text-muted">Caminho onde os vídeos serão salvos</small>
+            </div>
+            
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary">Iniciar Download</button>
+            </div>
+        </form>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

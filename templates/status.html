@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status do Download</title>
+    <link rel="icon" href="metube.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            padding-top: 2rem;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        h1 {
+            color: #0d6efd;
+            margin-bottom: 1.5rem;
+        }
+        .progress-container {
+            margin-bottom: 1.5rem;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+            padding: 0.5rem 2rem;
+        }
+        .alert {
+            margin-bottom: 1.5rem;
+        }
+        .status-badge {
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
+            margin-bottom: 1rem;
+        }
+        .progress {
+            height: 25px;
+        }
+        .progress-bar {
+            font-size: 14px;
+            line-height: 25px;
+        }
+        .current-title {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Status do Download</h1>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-info">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="text-center mb-4">
+            {% if status.running %}
+                <span class="badge bg-primary status-badge">Download em andamento...</span>
+            {% elif status.completed %}
+                <span class="badge bg-success status-badge">Download concluído!</span>
+                <div class="mt-2">
+                    <a href="/results" class="btn btn-success">Ver Resultados</a>
+                </div>
+            {% else %}
+                <span class="badge bg-secondary status-badge">Aguardando...</span>
+            {% endif %}
+        </div>
+
+        <div class="progress-container">
+            <h5>Progresso Geral: <span id="progress-text">{{ status.current_link }} de {{ status.total_links }}</span></h5>
+            <div class="progress mb-3">
+                <div id="total-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                     role="progressbar"
+                     style="width: {{ (status.current_link / status.total_links * 100) if status.total_links > 0 else 0 }}%">
+                    {{ (status.current_link / status.total_links * 100) if status.total_links > 0 else 0 }}%
+                </div>
+            </div>
+
+            <div id="current-title" class="current-title">{{ status.current_title or 'Preparando...' }}</div>
+            <div class="progress">
+                <div id="current-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                     role="progressbar"
+                     style="width: {{ status.current_percent }}%">
+                    {{ status.current_percent }}%
+                </div>
+            </div>
+        </div>
+
+        <div class="messages-container mb-4">
+            <h5>Mensagens:</h5>
+            <div id="messages-log" class="border p-3 rounded bg-light" style="max-height: 200px; overflow-y: auto;">
+                {% for msg in status.messages %}
+                    <div class="text-{{ 'danger' if msg.type == 'error' else 'warning' if msg.type == 'warning' else 'success' if msg.type == 'success' else 'info' }}">
+                        {{ msg.message }}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="text-center">
+            <a href="/" class="btn btn-primary">Voltar</a>
+        </div>
+    </div>
+
+    <script>
+        // Atualiza o status a cada 2 segundos
+        function updateStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Atualiza o progresso geral
+                    const progressText = document.getElementById('progress-text');
+                    progressText.textContent = `${data.current_link} de ${data.total_links}`;
+
+                    const totalProgressBar = document.getElementById('total-progress-bar');
+                    const totalPercent = data.total_links > 0 ? (data.current_link / data.total_links * 100).toFixed(0) : 0;
+                    totalProgressBar.style.width = `${totalPercent}%`;
+                    totalProgressBar.textContent = `${totalPercent}%`;
+
+                    // Atualiza o progresso atual
+                    const currentProgressBar = document.getElementById('current-progress-bar');
+                    currentProgressBar.style.width = `${data.current_percent}%`;
+                    currentProgressBar.textContent = `${data.current_percent}%`;
+
+                    // Atualiza o título atual
+                    const currentTitle = document.getElementById('current-title');
+                    currentTitle.textContent = data.current_title || 'Preparando...';
+
+                    // Atualiza as mensagens
+                    const messagesLog = document.getElementById('messages-log');
+                    messagesLog.innerHTML = '';
+
+                    data.messages.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.className = `text-${msg.type === 'error' ? 'danger' : msg.type === 'warning' ? 'warning' : msg.type === 'success' ? 'success' : 'info'}`;
+                        div.textContent = msg.message;
+                        messagesLog.appendChild(div);
+                    });
+
+                    // Rola para o final das mensagens
+                    messagesLog.scrollTop = messagesLog.scrollHeight;
+
+                    // Se o download estiver concluído, atualiza a página
+                    if (data.completed && !document.querySelector('.badge.bg-success')) {
+                        location.reload();
+                    }
+                });
+        }
+
+        // Atualiza imediatamente e depois a cada 2 segundos
+        updateStatus();
+        setInterval(updateStatus, 2000);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
