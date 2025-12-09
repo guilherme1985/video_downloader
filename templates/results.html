@@ -8,78 +8,185 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
+        :root {
+            --bg-body: #f8f9fa;
+            --bg-container: #ffffff;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --table-stripe: #f8f9fa;
+        }
+
+        [data-theme="dark"] {
+            --bg-body: #0d1117;
+            --bg-container: #161b22;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --shadow: rgba(0, 0, 0, 0.4);
+            --table-stripe: #0d1117;
+        }
+
+        * {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
         body {
             padding-top: 2rem;
-            background-color: #f8f9fa;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            min-height: 100vh;
         }
+
         .container {
-            max-width: 800px;
-            background-color: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            max-width: 900px;
+            background-color: var(--bg-container);
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px var(--shadow);
             margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
         }
+
+        .theme-toggle {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: var(--bg-container);
+            border: 2px solid var(--border-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 1.5rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px var(--shadow);
+            z-index: 1000;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            border-color: #0d6efd;
+        }
+
         h1 {
             color: #0d6efd;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
+            font-weight: 700;
+            font-size: 2.5rem;
         }
+
         .btn-primary {
             background-color: #0d6efd;
             border-color: #0d6efd;
-            padding: 0.5rem 2rem;
+            padding: 0.75rem 2.5rem;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s ease;
         }
+
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+        }
+
         .alert {
             margin-bottom: 1.5rem;
+            border-radius: 8px;
         }
+
         .results-table {
             margin-top: 1.5rem;
             margin-bottom: 1.5rem;
         }
+
+        .table {
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        .table thead th {
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+            font-weight: 600;
+            padding: 1rem;
+        }
+
+        .table tbody tr {
+            border-color: var(--border-color);
+        }
+
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: var(--table-stripe);
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(13, 110, 253, 0.1);
+        }
+
         .success-icon {
             color: #198754;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
         }
+
         .error-icon {
             color: #dc3545;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
         }
+
         .url-cell {
-            max-width: 300px;
+            max-width: 350px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        td, th {
+            padding: 1rem !important;
         }
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+        <span id="theme-icon">🌙</span>
+    </button>
+
     <div class="container">
         <h1 class="text-center">Resultados do Download</h1>
 
         <div class="alert alert-success">
-            <i class="bi bi-check-circle-fill me-2"></i> Download concluído!
+            <i class="bi bi-check-circle-fill me-2"></i> Download concluído com sucesso!
         </div>
 
         <div class="results-table">
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>Status</th>
+                        <th style="width: 80px;">Status</th>
                         <th>Título</th>
-                        <th>URL</th>
+                        <th style="width: 350px;">URL</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for link, info in status.links_status.items() %}
                         <tr>
-                            <td>
+                            <td class="text-center">
                                 {% if info.status == 'success' %}
                                     <i class="bi bi-check-circle-fill success-icon"></i>
                                 {% else %}
                                     <i class="bi bi-x-circle-fill error-icon"></i>
                                 {% endif %}
                             </td>
-                            <td>{{ info.title or 'Não disponível' }}</td>
+                            <td style="font-weight: 500;">{{ info.title or 'Não disponível' }}</td>
                             <td class="url-cell" title="{{ link }}">{{ link }}</td>
                         </tr>
                     {% endfor %}
@@ -88,9 +195,48 @@
         </div>
 
         <div class="text-center">
-            <a href="/" class="btn btn-primary">Nova Tarefa</a>
+            <a href="/" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>Nova Tarefa
+            </a>
         </div>
     </div>
+
+    <script>
+        function getSystemTheme() {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        function setTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.getElementById('theme-icon').textContent = '☀️';
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                document.getElementById('theme-icon').textContent = '🌙';
+            }
+            localStorage.setItem('theme', theme);
+        }
+
+        function toggleTheme() {
+            const currentTheme = localStorage.getItem('theme') || getSystemTheme();
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        }
+
+        // Inicializa o tema
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('theme');
+            const themeToUse = savedTheme || getSystemTheme();
+            setTheme(themeToUse);
+        });
+
+        // Escuta mudanças no tema do sistema
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        });
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
