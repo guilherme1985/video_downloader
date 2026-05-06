@@ -1,88 +1,122 @@
 # Video Downloader
 
-Uma aplicação Dockerizada para download de vídeos de plataformas como YouTube e outros sites compatíveis.
+Aplicação Flask + yt-dlp para download de vídeos/playlists do YouTube e
+sites compatíveis, com interface web, fila de jobs em memória, suporte a
+múltiplos formatos e cancelamento.
 
 ## 📋 Pré-requisitos
 
-- Docker
-- Docker Compose
+- Docker e Docker Compose
 
-## Como usar
+## 🚀 Como usar
 
-### 1. Iniciar a aplicação
-
-Execute o comando abaixo dentro da pasta do projeto:
+### 1. Configurar `.env`
 
 ```bash
-docker-compose up -d
+cp .env.example .env
+# Gere um SECRET_KEY forte:
+echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
+# Edite o .env e ajuste HOST_DOWNLOAD_PATH, APP_UID/APP_GID conforme seu sistema
 ```
 
-### 2. Parar a aplicação
+> **Dica de permissões:** rode `id -u` e `id -g` no host para descobrir
+> seu UID/GID e coloque-os em `APP_UID`/`APP_GID`. Os arquivos baixados
+> ficarão com seu usuário em vez de `root`.
 
-Para parar o container:
+### 2. Subir a aplicação
+
+```bash
+docker-compose up -d --build
+```
+
+Acesse [http://localhost:5000](http://localhost:5000).
+
+### 3. Parar
 
 ```bash
 docker-compose down
 ```
 
-### 3. Atualizar a aplicação
+### 4. Atualizar o `yt-dlp`
 
-Caso tenha alterações no container:
-
-```bash
-docker-compose pull
-```
-
-## Configuração de permissões do Docker (se necessário)
-
-Se você encontrar problemas de permissão, execute os comandos abaixo:
-
-### Adicionar usuário ao grupo docker
+O YouTube quebra extractors com frequência. Quando começar a falhar,
+faça rebuild para pegar a versão nova do `yt-dlp`:
 
 ```bash
-sudo usermod -aG docker $USER
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
-### Aplicar as alterações
+## 🔧 Funcionalidades
+
+- **Download único, playlist ou lote via .txt**
+- **Formatos disponíveis:** melhor disponível, 1080p / 720p / 480p,
+  áudio MP3, áudio M4A
+- **Múltiplos jobs** simultâneos sem conflito (cada um tem seu UUID)
+- **Cancelar download** em andamento pelo botão na tela de status
+- **Histórico** dos últimos N jobs (configurável) na tela inicial
+- **Tema light/dark** com persistência
+
+## 🔐 Segurança
+
+- O caminho de destino é validado contra `ALLOWED_DOWNLOAD_ROOT` para
+  bloquear path traversal.
+- Uploads passam por `secure_filename` e têm limite de tamanho.
+- O container roda como usuário não-root.
+- `SECRET_KEY` é obrigatório (não há fallback em produção).
+- Modo debug fica desligado por padrão.
+
+## ⚙️ Variáveis de ambiente
+
+| Variável                | Default              | Descrição                                    |
+|-------------------------|----------------------|----------------------------------------------|
+| `SECRET_KEY`            | *(obrigatório)*      | Chave para Flask sessions/flash              |
+| `DEFAULT_DOWNLOAD_PATH` | `/mnt/nas/Downloads` | Pasta padrão no formulário                   |
+| `ALLOWED_DOWNLOAD_ROOT` | `=DEFAULT`           | Raiz permitida (anti path-traversal)         |
+| `MAX_LINKS`             | `500`                | Máximo de links por job                      |
+| `MAX_UPLOAD_MB`         | `1`                  | Tamanho máximo do .txt enviado               |
+| `MAX_JOBS_KEPT`         | `20`                 | Jobs mantidos em memória (LRU)               |
+| `FLASK_DEBUG`           | `0`                  | `1` ativa debug (NÃO em produção)            |
+
+## 📂 Estrutura
+
+```
+.
+├── app.py                    # Flask: rotas + estado de jobs
+├── download_videos.py        # Wrapper yt-dlp orientado a callbacks
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+├── .env.example
+├── README.md
+├── static/
+│   ├── favicon.ico
+│   ├── metube.png
+│   ├── theme.css             # Estilos compartilhados
+│   └── theme.js              # Toggle light/dark
+└── templates/
+    ├── base.html             # Template base (extends pelos demais)
+    ├── index.html
+    ├── status.html           # Polling para /api/status/<id>
+    └── results.html
+```
+
+## 🧪 Uso CLI (sem Flask)
+
+O `download_videos.py` ainda funciona standalone:
 
 ```bash
-newgrp docker
+python download_videos.py links.txt /caminho/destino video best
+python download_videos.py links.txt /caminho/destino playlist 720p
+python download_videos.py links.txt /caminho/destino video audio_mp3
 ```
 
-## Interface
+Cada evento é emitido como JSON em uma linha do stdout — útil para
+integração com outros scripts.
 
-![Interface da aplicação](front.png)
+## 📌 Notas
 
-## Funcionalidades
-
-A aplicação funciona com qualquer site que siga as mesmas regras do YouTube.
-
-### 1. Download de vídeo único
-- Selecione a opção **Video**
-- Cole o link do vídeo na caixa de texto
-
-### 2. Download de playlist
-- Selecione a opção **Playlist**
-- Cole o link da playlist na caixa de texto
-
-### 3. Download via arquivo de texto
-- Carregue um arquivo `.txt` contendo os links
-- O arquivo deve conter apenas um tipo de link (direto ou playlist)
-- Cada link deve estar em uma linha separada
-
-## Customização
-- No *app.py* voce customizar o caminho padrão de salvamento
-```bash
-DEFAULT_PATH = "/mnt/nas/Downloads"
-```
-    -  Ajuste tambem no *download_videos.py*
-```bash
-download_path = sys.argv[2] if len(sys.argv) > 2 else "/mnt/nas/Downloads"
-```
-
-## Observações
-
-- Certifique-se de que os links sejam válidos e acessíveis
-- Verifique se o firewall ou antivirus nãoe esta bloqueando a porta usanda (padrão: 5000)
-- Para playlists, todos os vídeos serão baixados sequencialmente
-- Os downloads são salvos no diretório informado
+- Verifique se o firewall não está bloqueando a porta configurada.
+- Os logs por sessão ficam em `download_log.txt` dentro da pasta de download.
+- Para vídeos restritos (idade, membros), `yt-dlp` precisa de cookies —
+  uma issue conhecida e fora do escopo atual.

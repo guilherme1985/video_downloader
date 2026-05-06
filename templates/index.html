@@ -1,297 +1,91 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Downloader</title>
-    <link rel="icon" href="{{ url_for('static', filename='metube.png') }}" type="image/x-icon">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-body: #f8f9fa;
-            --bg-container: #ffffff;
-            --text-primary: #212529;
-            --text-secondary: #6c757d;
-            --border-color: #dee2e6;
-            --input-bg: #ffffff;
-            --input-text: #212529;
-            --input-border: #ced4da;
-            --shadow: rgba(0, 0, 0, 0.1);
-            --alert-bg: #d1ecf1;
-            --alert-text: #0c5460;
-            --alert-border: #bee5eb;
-        }
+{% extends "base.html" %}
+{% block title %}Video Downloader{% endblock %}
 
-        [data-theme="dark"] {
-            --bg-body: #0d1117;
-            --bg-container: #161b22;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --border-color: #30363d;
-            --input-bg: #0d1117;
-            --input-text: #e6edf3;
-            --input-border: #30363d;
-            --shadow: rgba(0, 0, 0, 0.4);
-            --alert-bg: #1c2d3a;
-            --alert-text: #58a6ff;
-            --alert-border: #30363d;
-        }
+{% block content %}
+<h1 class="text-center">Video Downloader</h1>
 
-        * {
-            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-        }
-
-        body {
-            padding-top: 2rem;
-            background-color: var(--bg-body);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 800px;
-            background-color: var(--bg-container);
-            padding: 2.5rem;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px var(--shadow);
-            border: 1px solid var(--border-color);
-        }
-
-        .theme-toggle {
-            position: fixed;
-            top: 1.5rem;
-            right: 1.5rem;
-            background: var(--bg-container);
-            border: 2px solid var(--border-color);
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 1.5rem;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px var(--shadow);
-            z-index: 1000;
-        }
-
-        .theme-toggle:hover {
-            transform: scale(1.1);
-            border-color: #0d6efd;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .btn-primary {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-            padding: 0.75rem 2.5rem;
-            font-weight: 500;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary:hover {
-            background-color: #0b5ed7;
-            border-color: #0a58ca;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-        }
-
-        h1 {
-            color: #0d6efd;
-            margin-bottom: 2rem;
-            font-weight: 700;
-            font-size: 2.5rem;
-        }
-
-        .alert {
-            margin-bottom: 1.5rem;
-            background-color: var(--alert-bg);
-            color: var(--alert-text);
-            border-color: var(--alert-border);
-            border-radius: 8px;
-        }
-
-        .radio-group {
-            display: flex;
-            gap: 2rem;
-            margin-bottom: 1rem;
-        }
-
-        .form-control {
-            background-color: var(--input-bg);
-            color: var(--input-text);
-            border-color: var(--input-border);
-            border-radius: 8px;
-            padding: 0.75rem;
-        }
-
-        .form-control:focus {
-            background-color: var(--input-bg);
-            color: var(--input-text);
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-        }
-
-        .form-control::placeholder {
-            color: var(--text-secondary);
-        }
-
-        .form-text {
-            color: var(--text-secondary) !important;
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-        }
-
-        .form-label {
-            color: var(--text-primary);
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
-
-        .form-check-label {
-            color: var(--text-primary);
-        }
-
-        .form-check-input {
-            background-color: var(--input-bg);
-            border-color: var(--input-border);
-            cursor: pointer;
-        }
-
-        .form-check-input:checked {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-
-        .form-check-input:focus {
-            border-color: #0d6efd;
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-        }
-
-        textarea.form-control {
-            resize: vertical;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-        }
-
-        input[type="file"] {
-            cursor: pointer;
-        }
-
-        input[type="file"]::file-selector-button {
-            background-color: #0d6efd;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-right: 1rem;
-        }
-
-        input[type="file"]::file-selector-button:hover {
-            background-color: #0b5ed7;
-        }
-    </style>
-</head>
-<body>
-    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
-        <span id="theme-icon">🌙</span>
-    </button>
-
-    <div class="container">
-        <h1 class="text-center">Video Downloader</h1>
-
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            {% for message in messages %}
-              <div class="alert alert-info">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <form method="post" enctype="multipart/form-data">
-            <div class="form-group">
-                <label class="form-label">Tipo de Download:</label>
-                <div class="radio-group">
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="download_type" id="video" value="video" checked>
-                        <label class="form-check-label" for="video">
-                            Vídeo
-                        </label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="download_type" id="playlist" value="playlist">
-                        <label class="form-check-label" for="playlist">
-                            Playlist
-                        </label>
-                    </div>
-                </div>
+<form method="post" enctype="multipart/form-data">
+    <div class="form-group">
+        <label class="form-label">Tipo de Download:</label>
+        <div class="radio-group">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="download_type"
+                       id="video" value="video" checked>
+                <label class="form-check-label" for="video">Vídeo</label>
             </div>
-
-            <div class="form-group">
-                <label class="form-label">Arquivo .txt com links:</label>
-                <input type="file" class="form-control" name="file">
-                <small class="form-text">Selecione um arquivo .txt contendo um link por linha</small>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="download_type"
+                       id="playlist" value="playlist">
+                <label class="form-check-label" for="playlist">Playlist</label>
             </div>
-
-            <div class="form-group">
-                <label class="form-label">Ou cole os links (um por linha):</label>
-                <textarea name="links" class="form-control" rows="8" placeholder="https://www.youtube.com/watch?v=exemplo1&#10;https://www.youtube.com/watch?v=exemplo2"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Pasta de destino:</label>
-                <input type="text" class="form-control" name="dest_path" value="{{ default_path }}">
-                <small class="form-text">Caminho onde os vídeos serão salvos</small>
-            </div>
-
-            <div class="text-center">
-                <button type="submit" class="btn btn-primary">Iniciar Download</button>
-            </div>
-        </form>
+        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function getSystemTheme() {
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
+    <div class="form-group">
+        <label class="form-label" for="format">Formato / Qualidade:</label>
+        <select class="form-select" id="format" name="format">
+            <option value="best" selected>Melhor disponível (vídeo)</option>
+            <option value="1080p">Vídeo até 1080p</option>
+            <option value="720p">Vídeo até 720p</option>
+            <option value="480p">Vídeo até 480p</option>
+            <option value="audio_mp3">Apenas áudio — MP3</option>
+            <option value="audio_m4a">Apenas áudio — M4A</option>
+        </select>
+    </div>
 
-        function setTheme(theme) {
-            if (theme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                document.getElementById('theme-icon').textContent = '☀️';
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-                document.getElementById('theme-icon').textContent = '🌙';
-            }
-            localStorage.setItem('theme', theme);
-        }
+    <div class="form-group">
+        <label class="form-label">Arquivo .txt com links:</label>
+        <input type="file" class="form-control" name="file" accept=".txt">
+        <small class="form-text">
+            Selecione um arquivo .txt contendo um link por linha.
+            Linhas iniciadas com <code>#</code> são ignoradas.
+        </small>
+    </div>
 
-        function toggleTheme() {
-            const currentTheme = localStorage.getItem('theme') || getSystemTheme();
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            setTheme(newTheme);
-        }
+    <div class="form-group">
+        <label class="form-label">Ou cole os links (um por linha):</label>
+        <textarea name="links" class="form-control" rows="8"
+                  placeholder="https://www.youtube.com/watch?v=exemplo1&#10;https://www.youtube.com/watch?v=exemplo2"></textarea>
+    </div>
 
-        // Inicializa o tema
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('theme');
-            const themeToUse = savedTheme || getSystemTheme();
-            setTheme(themeToUse);
-        });
+    <div class="form-group">
+        <label class="form-label">Pasta de destino:</label>
+        <input type="text" class="form-control" name="dest_path" value="{{ default_path }}">
+        <small class="form-text">
+            Caminho onde os vídeos serão salvos (deve estar dentro da raiz permitida).
+        </small>
+    </div>
 
-        // Escuta mudanças no tema do sistema
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            if (!localStorage.getItem('theme')) {
-                setTheme(e.matches ? 'dark' : 'light');
-            }
-        });
-    </script>
-</body>
-</html>
+    <div class="text-center">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-download me-2"></i>Iniciar Download
+        </button>
+    </div>
+</form>
+
+{% if recent_jobs %}
+<div class="recent-jobs">
+    <h5><i class="bi bi-clock-history me-2"></i>Tarefas recentes</h5>
+    {% for j in recent_jobs %}
+        <a href="{{ url_for('status', job_id=j.id) }}">
+            <span class="badge {% if j.running %}bg-primary
+                              {% elif j.cancelled %}bg-secondary
+                              {% elif j.completed %}bg-success
+                              {% else %}bg-light text-dark{% endif %}">
+                {% if j.running %}Em andamento
+                {% elif j.cancelled %}Cancelado
+                {% elif j.completed %}Concluído
+                {% else %}—{% endif %}
+            </span>
+            <span class="ms-2">{{ j.total_links }} link(s)</span>
+            <span class="ms-2 text-muted">·</span>
+            <span class="ms-2">{{ j.format }}</span>
+            {% if j.is_playlist %}
+              <span class="ms-2 text-muted">· playlist</span>
+            {% endif %}
+            <span class="float-end text-muted">{{ j.id[:8] }}</span>
+        </a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

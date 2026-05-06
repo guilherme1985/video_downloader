@@ -1,337 +1,196 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Status do Download</title>
-    <link rel="icon" href="{{ url_for('static', filename='metube.png') }}" type="image/x-icon">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <style>
-        :root {
-            --bg-body: #f8f9fa;
-            --bg-container: #ffffff;
-            --text-primary: #212529;
-            --text-secondary: #6c757d;
-            --border-color: #dee2e6;
-            --shadow: rgba(0, 0, 0, 0.1);
-            --log-bg: #f8f9fa;
-        }
+{% extends "base.html" %}
+{% block title %}Status do Download{% endblock %}
 
-        [data-theme="dark"] {
-            --bg-body: #0d1117;
-            --bg-container: #161b22;
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --border-color: #30363d;
-            --shadow: rgba(0, 0, 0, 0.4);
-            --log-bg: #0d1117;
-        }
+{% block content %}
+<h1 class="text-center">Status do Download</h1>
 
-        * {
-            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-        }
+<div class="text-center mb-4" id="status-section">
+    <span id="status-badge" class="badge status-badge
+        {% if status.running %}bg-primary
+        {% elif status.cancelled %}bg-secondary
+        {% elif status.completed %}bg-success
+        {% else %}bg-secondary{% endif %}">
+        {% if status.running %}
+            <i class="bi bi-arrow-clockwise me-2"></i>Download em andamento...
+        {% elif status.cancelled %}
+            <i class="bi bi-x-circle-fill me-2"></i>Cancelado
+        {% elif status.completed %}
+            <i class="bi bi-check-circle-fill me-2"></i>Download concluído!
+        {% else %}
+            <i class="bi bi-hourglass-split me-2"></i>Aguardando...
+        {% endif %}
+    </span>
 
-        body {
-            padding-top: 2rem;
-            background-color: var(--bg-body);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
+    <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
+        <a id="btn-results" href="{{ url_for('results', job_id=status.id) }}"
+           class="btn btn-success {% if status.running %}d-none{% endif %}">
+            <i class="bi bi-list-check me-2"></i>Ver Resultados
+        </a>
+        <button id="btn-cancel" class="btn btn-outline-danger
+                {% if not status.running %}d-none{% endif %}"
+                onclick="cancelJob()">
+            <i class="bi bi-stop-circle me-2"></i>Cancelar
+        </button>
+    </div>
+</div>
 
-        .container {
-            max-width: 800px;
-            background-color: var(--bg-container);
-            padding: 2.5rem;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px var(--shadow);
-            border: 1px solid var(--border-color);
-        }
-
-        .theme-toggle {
-            position: fixed;
-            top: 1.5rem;
-            right: 1.5rem;
-            background: var(--bg-container);
-            border: 2px solid var(--border-color);
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 1.5rem;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px var(--shadow);
-            z-index: 1000;
-        }
-
-        .theme-toggle:hover {
-            transform: scale(1.1);
-            border-color: #0d6efd;
-        }
-
-        h1 {
-            color: #0d6efd;
-            margin-bottom: 2rem;
-            font-weight: 700;
-            font-size: 2.5rem;
-        }
-
-        .progress-container {
-            margin-bottom: 2rem;
-        }
-
-        .btn-primary {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-            padding: 0.75rem 2.5rem;
-            font-weight: 500;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary:hover {
-            background-color: #0b5ed7;
-            border-color: #0a58ca;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-        }
-
-        .btn-success {
-            padding: 0.75rem 2.5rem;
-            font-weight: 500;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
-        }
-
-        .alert {
-            margin-bottom: 1.5rem;
-            border-radius: 8px;
-        }
-
-        .status-badge {
-            font-size: 1.1rem;
-            padding: 0.75rem 1.5rem;
-            margin-bottom: 1rem;
-            border-radius: 8px;
-        }
-
-        .progress {
-            height: 30px;
-            border-radius: 8px;
-            background-color: var(--log-bg);
-            border: 1px solid var(--border-color);
-        }
-
-        .progress-bar {
-            font-size: 14px;
-            line-height: 30px;
-            font-weight: 500;
-            border-radius: 7px;
-        }
-
-        .current-title {
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-            color: var(--text-primary);
-            font-size: 1.1rem;
-        }
-
-        h5 {
-            color: var(--text-primary);
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-
-        .messages-container {
-            margin-bottom: 2rem;
-        }
-
-        #messages-log {
-            border: 1px solid var(--border-color);
-            padding: 1rem;
-            border-radius: 8px;
-            background-color: var(--log-bg);
-            max-height: 250px;
-            overflow-y: auto;
-        }
-
-        #messages-log > div {
-            padding: 0.5rem;
-            margin-bottom: 0.5rem;
-            border-radius: 4px;
-        }
-
-        #progress-text {
-            color: #0d6efd;
-            font-weight: 700;
-        }
-    </style>
-</head>
-<body>
-    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
-        <span id="theme-icon">🌙</span>
-    </button>
-
-    <div class="container">
-        <h1 class="text-center">Status do Download</h1>
-
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}
-            {% for message in messages %}
-              <div class="alert alert-info">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <div class="text-center mb-4">
-            {% if status.running %}
-                <span class="badge bg-primary status-badge">
-                    <i class="bi bi-arrow-clockwise me-2"></i>Download em andamento...
-                </span>
-            {% elif status.completed %}
-                <span class="badge bg-success status-badge">
-                    <i class="bi bi-check-circle-fill me-2"></i>Download concluído!
-                </span>
-                <div class="mt-3">
-                    <a href="/results" class="btn btn-success">Ver Resultados</a>
-                </div>
-            {% else %}
-                <span class="badge bg-secondary status-badge">
-                    <i class="bi bi-hourglass-split me-2"></i>Aguardando...
-                </span>
-            {% endif %}
-        </div>
-
-        <div class="progress-container">
-            <h5>Progresso Geral: <span id="progress-text">{{ status.current_link }} de {{ status.total_links }}</span></h5>
-            <div class="progress mb-3">
-                <div id="total-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
-                     role="progressbar"
-                     style="width: {{ (status.current_link / status.total_links * 100) if status.total_links > 0 else 0 }}%">
-                    {{ (status.current_link / status.total_links * 100) if status.total_links > 0 else 0 }}%
-                </div>
-            </div>
-
-            <div id="current-title" class="current-title">
-                <i class="bi bi-film me-2"></i>{{ status.current_title or 'Preparando...' }}
-            </div>
-            <div class="progress">
-                <div id="current-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                     role="progressbar"
-                     style="width: {{ status.current_percent }}%">
-                    {{ status.current_percent }}%
-                </div>
-            </div>
-        </div>
-
-        <div class="messages-container">
-            <h5><i class="bi bi-chat-left-text me-2"></i>Mensagens:</h5>
-            <div id="messages-log">
-                {% for msg in status.messages %}
-                    <div class="text-{{ 'danger' if msg.type == 'error' else 'warning' if msg.type == 'warning' else 'success' if msg.type == 'success' else 'info' }}">
-                        {{ msg.message }}
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="text-center">
-            <a href="/" class="btn btn-primary">
-                <i class="bi bi-arrow-left me-2"></i>Voltar
-            </a>
+<div class="progress-container">
+    <h5>
+        Progresso Geral:
+        <span id="progress-text">{{ status.current_link }} de {{ status.total_links }}</span>
+    </h5>
+    <div class="progress mb-3">
+        <div id="total-progress-bar"
+             class="progress-bar progress-bar-striped {% if status.running %}progress-bar-animated{% endif %}"
+             role="progressbar"
+             style="width: {{ ((status.current_link / status.total_links * 100)|round(0))
+                              if status.total_links > 0 else 0 }}%">
+            {{ ((status.current_link / status.total_links * 100)|round(0)|int)
+                if status.total_links > 0 else 0 }}%
         </div>
     </div>
 
-    <script>
-        function getSystemTheme() {
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    <div id="current-title" class="current-title">
+        <i class="bi bi-film me-2"></i>{{ status.current_title or 'Preparando...' }}
+    </div>
+    <div class="progress">
+        <div id="current-progress-bar"
+             class="progress-bar progress-bar-striped {% if status.running %}progress-bar-animated{% endif %} bg-success"
+             role="progressbar"
+             style="width: {{ status.current_percent|round(0) }}%">
+            {{ status.current_percent|round(0)|int }}%
+        </div>
+    </div>
+</div>
+
+<div class="messages-container">
+    <h5><i class="bi bi-chat-left-text me-2"></i>Mensagens:</h5>
+    <div id="messages-log">
+        {% for msg in status.messages[-100:] %}
+            <div class="text-{{ 'danger' if msg.type == 'error'
+                              else 'warning' if msg.type == 'warning'
+                              else 'success' if msg.type == 'success'
+                              else 'info' }}">
+                {{ msg.message }}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="text-center">
+    <a href="{{ url_for('index') }}" class="btn btn-primary">
+        <i class="bi bi-arrow-left me-2"></i>Voltar
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const JOB_ID = "{{ status.id }}";
+    let pollInterval = null;
+
+    function fmtTs(ts) {
+        if (!ts) return '';
+        const d = new Date(ts * 1000);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit',
+                                          second: '2-digit' });
+    }
+
+    function applyState(data) {
+        // Texto e barras
+        document.getElementById('progress-text').textContent =
+            `${data.current_link} de ${data.total_links}`;
+
+        const totalBar = document.getElementById('total-progress-bar');
+        const totalPct = data.total_links > 0
+            ? Math.round(data.current_link / data.total_links * 100)
+            : 0;
+        totalBar.style.width = `${totalPct}%`;
+        totalBar.textContent = `${totalPct}%`;
+
+        const curBar = document.getElementById('current-progress-bar');
+        const curPct = Math.round(data.current_percent || 0);
+        curBar.style.width = `${curPct}%`;
+        curBar.textContent = `${curPct}%`;
+
+        document.getElementById('current-title').innerHTML =
+            `<i class="bi bi-film me-2"></i>${data.current_title || 'Preparando...'}`;
+
+        // Mensagens (últimas 100, com timestamp)
+        const log = document.getElementById('messages-log');
+        const wasNearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 50;
+        log.innerHTML = '';
+        const recent = data.messages.slice(-100);
+        for (const msg of recent) {
+            const div = document.createElement('div');
+            const cls = msg.type === 'error' ? 'danger'
+                      : msg.type === 'warning' ? 'warning'
+                      : msg.type === 'success' ? 'success' : 'info';
+            div.className = `text-${cls}`;
+            const ts = msg.ts ? `<span class="ts">${fmtTs(msg.ts)}</span>` : '';
+            div.innerHTML = `${ts}${escapeHtml(msg.message || '')}`;
+            log.appendChild(div);
+        }
+        if (wasNearBottom) log.scrollTop = log.scrollHeight;
+
+        // Badge e botões
+        const badge = document.getElementById('status-badge');
+        const btnResults = document.getElementById('btn-results');
+        const btnCancel = document.getElementById('btn-cancel');
+
+        badge.classList.remove('bg-primary', 'bg-success', 'bg-secondary');
+        if (data.running) {
+            badge.classList.add('bg-primary');
+            badge.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Download em andamento...';
+            btnResults.classList.add('d-none');
+            btnCancel.classList.remove('d-none');
+        } else if (data.cancelled) {
+            badge.classList.add('bg-secondary');
+            badge.innerHTML = '<i class="bi bi-x-circle-fill me-2"></i>Cancelado';
+            btnResults.classList.remove('d-none');
+            btnCancel.classList.add('d-none');
+        } else if (data.completed) {
+            badge.classList.add('bg-success');
+            badge.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Download concluído!';
+            btnResults.classList.remove('d-none');
+            btnCancel.classList.add('d-none');
         }
 
-        function setTheme(theme) {
-            if (theme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                document.getElementById('theme-icon').textContent = '☀️';
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-                document.getElementById('theme-icon').textContent = '🌙';
-            }
-            localStorage.setItem('theme', theme);
+        // Tira animação das barras quando termina
+        if (!data.running) {
+            totalBar.classList.remove('progress-bar-animated');
+            curBar.classList.remove('progress-bar-animated');
         }
 
-        function toggleTheme() {
-            const currentTheme = localStorage.getItem('theme') || getSystemTheme();
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            setTheme(newTheme);
+        // Para o polling
+        if (!data.running && pollInterval !== null) {
+            clearInterval(pollInterval);
+            pollInterval = null;
         }
+    }
 
-        // Inicializa o tema
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('theme');
-            const themeToUse = savedTheme || getSystemTheme();
-            setTheme(themeToUse);
-        });
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;',
+            '"': '&quot;', "'": '&#39;',
+        }[c]));
+    }
 
-        // Escuta mudanças no tema do sistema
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            if (!localStorage.getItem('theme')) {
-                setTheme(e.matches ? 'dark' : 'light');
-            }
-        });
+    async function updateStatus() {
+        try {
+            const r = await fetch(`/api/status/${JOB_ID}`);
+            if (!r.ok) return;
+            applyState(await r.json());
+        } catch (_) { /* ignora erro transitório de rede */ }
+    }
 
-        // Atualiza o status a cada 2 segundos
-        function updateStatus() {
-            fetch('/api/status')
-                .then(response => response.json())
-                .then(data => {
-                    const progressText = document.getElementById('progress-text');
-                    progressText.textContent = `${data.current_link} de ${data.total_links}`;
-
-                    const totalProgressBar = document.getElementById('total-progress-bar');
-                    const totalPercent = data.total_links > 0 ? (data.current_link / data.total_links * 100).toFixed(0) : 0;
-                    totalProgressBar.style.width = `${totalPercent}%`;
-                    totalProgressBar.textContent = `${totalPercent}%`;
-
-                    const currentProgressBar = document.getElementById('current-progress-bar');
-                    currentProgressBar.style.width = `${data.current_percent}%`;
-                    currentProgressBar.textContent = `${data.current_percent}%`;
-
-                    const currentTitle = document.getElementById('current-title');
-                    currentTitle.innerHTML = `<i class="bi bi-film me-2"></i>${data.current_title || 'Preparando...'}`;
-
-                    const messagesLog = document.getElementById('messages-log');
-                    messagesLog.innerHTML = '';
-
-                    data.messages.forEach(msg => {
-                        const div = document.createElement('div');
-                        div.className = `text-${msg.type === 'error' ? 'danger' : msg.type === 'warning' ? 'warning' : msg.type === 'success' ? 'success' : 'info'}`;
-                        div.textContent = msg.message;
-                        messagesLog.appendChild(div);
-                    });
-
-                    messagesLog.scrollTop = messagesLog.scrollHeight;
-
-                    if (data.completed && !document.querySelector('.badge.bg-success')) {
-                        location.reload();
-                    }
-                });
-        }
-
+    async function cancelJob() {
+        if (!confirm('Tem certeza que deseja cancelar este download?')) return;
+        await fetch(`/api/cancel/${JOB_ID}`, { method: 'POST' });
         updateStatus();
-        setInterval(updateStatus, 2000);
-    </script>
+    }
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    updateStatus();
+    pollInterval = setInterval(updateStatus, 2000);
+</script>
+{% endblock %}

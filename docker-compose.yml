@@ -1,8 +1,21 @@
 services:
   video-downloader:
-    build: .
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    container_name: video-downloader
     ports:
-      - "5000:5000"
+      - "${HOST_PORT:-5000}:5000"
     volumes:
-      - /mnt/nas/Downloads:/mnt/nas/Downloads
+      - ${HOST_DOWNLOAD_PATH:-/mnt/nas/Downloads}:/mnt/nas/Downloads
+    environment:
+      DEFAULT_DOWNLOAD_PATH: "/mnt/nas/Downloads"
+      ALLOWED_DOWNLOAD_ROOT: "/mnt/nas/Downloads"
+      SECRET_KEY: "${SECRET_KEY:?defina SECRET_KEY no .env}"
+      MAX_LINKS: "${MAX_LINKS:-500}"
+      MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-1}"
+      MAX_JOBS_KEPT: "${MAX_JOBS_KEPT:-20}"
+      FLASK_DEBUG: "0"
     restart: unless-stopped
