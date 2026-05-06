@@ -2,104 +2,135 @@
 {% block title %}Video Downloader{% endblock %}
 
 {% block content %}
-<h1 class="text-center">Video Downloader</h1>
+<div class="shell">
+    <div class="eyebrow">Nova tarefa</div>
+    <h1 class="title-display">Video Downloader</h1>
+    <p class="subtitle">
+        Cole um link, envie um <span class="mono">.txt</span> ou ambos.
+        Vídeos individuais, playlists ou downloads paralelos.
+    </p>
 
-<form method="post" enctype="multipart/form-data">
-    <div class="form-group">
-        <label class="form-label">Tipo de Download:</label>
-        <div class="radio-group">
-            <div class="form-check">
-                <input class="form-check-input" type="radio" name="download_type"
-                       id="video" value="video" checked>
-                <label class="form-check-label" for="video">Vídeo</label>
+    <form method="post" enctype="multipart/form-data">
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">01 · Tipo</span>
             </div>
-            <div class="form-check">
-                <input class="form-check-input" type="radio" name="download_type"
-                       id="playlist" value="playlist">
-                <label class="form-check-label" for="playlist">Playlist</label>
+            <div class="radio-group">
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="download_type"
+                           id="video" value="video" checked>
+                    <label class="form-check-label" for="video">Vídeo único</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="download_type"
+                           id="playlist" value="playlist">
+                    <label class="form-check-label" for="playlist">Playlist</label>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="row">
-        <div class="col-md-8 form-group">
-            <label class="form-label" for="format">Formato / Qualidade:</label>
-            <select class="form-select" id="format" name="format">
-                <option value="best" selected>Melhor disponível (vídeo)</option>
-                <option value="1080p">Vídeo até 1080p</option>
-                <option value="720p">Vídeo até 720p</option>
-                <option value="480p">Vídeo até 480p</option>
-                <option value="audio_mp3">Apenas áudio — MP3</option>
-                <option value="audio_m4a">Apenas áudio — M4A</option>
-            </select>
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">02 · Formato &amp; paralelismo</span>
+            </div>
+            <div class="form-row-grid">
+                <div class="field">
+                    <label class="field-label" for="format">Formato / qualidade</label>
+                    <select class="form-select" id="format" name="format">
+                        <option value="best" selected>Melhor disponível (vídeo)</option>
+                        <option value="1080p">Vídeo até 1080p</option>
+                        <option value="720p">Vídeo até 720p</option>
+                        <option value="480p">Vídeo até 480p</option>
+                        <option value="audio_mp3">Apenas áudio — MP3</option>
+                        <option value="audio_m4a">Apenas áudio — M4A</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field-label" for="workers">Downloads paralelos</label>
+                    <input type="number" class="input mono" id="workers"
+                           name="workers" min="1" max="{{ max_workers }}"
+                           value="{{ default_workers }}">
+                    <small class="form-text">
+                        1 = sequencial · máx. {{ max_workers }}
+                    </small>
+                </div>
+            </div>
         </div>
-        <div class="col-md-4 form-group">
-            <label class="form-label" for="workers">
-                Downloads paralelos:
-            </label>
-            <input type="number" class="form-control" id="workers"
-                   name="workers" min="1" max="{{ max_workers }}"
-                   value="{{ default_workers }}">
-            <small class="form-text">1 = sequencial · máx. {{ max_workers }}</small>
+
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">03 · Links</span>
+            </div>
+            <div class="field">
+                <label class="field-label">Arquivo .txt</label>
+                <input type="file" class="form-control" name="file" accept=".txt">
+                <small class="form-text">
+                    Um link por linha. Linhas começando com
+                    <span class="mono">#</span> são ignoradas.
+                </small>
+            </div>
+            <div class="field">
+                <label class="field-label">Ou cole abaixo</label>
+                <textarea name="links" class="form-control mono" rows="6"
+                          placeholder="https://www.youtube.com/watch?v=&#10;https://www.youtube.com/playlist?list="></textarea>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">04 · Destino</span>
+            </div>
+            <div class="field" style="margin-bottom:0">
+                <label class="field-label">Pasta no servidor</label>
+                <input type="text" class="input mono" name="dest_path"
+                       value="{{ default_path }}">
+                <small class="form-text">
+                    Deve estar dentro da raiz permitida no servidor.
+                </small>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-download"></i>
+                <span>Iniciar download</span>
+            </button>
+        </div>
+    </form>
+
+    {% if recent_jobs %}
+    <div class="recent-jobs">
+        <h5 class="section-title">
+            <i class="bi bi-clock-history me-2"></i>Tarefas recentes
+        </h5>
+        <div class="recent-list">
+            {% for j in recent_jobs %}
+                <a class="recent-item"
+                   href="{{ url_for('status', job_id=j.id) }}">
+                    <span class="pill {% if j.running %}running
+                                       {% elif j.cancelled %}cancelled
+                                       {% elif j.completed %}completed{% endif %}">
+                        {% if j.running %}em andamento
+                        {% elif j.cancelled %}cancelado
+                        {% elif j.completed %}concluído
+                        {% else %}—{% endif %}
+                    </span>
+                    <span>{{ j.total_links }} link(s)</span>
+                    <span class="meta">·</span>
+                    <span class="meta mono">{{ j.format }}</span>
+                    {% if j.is_playlist %}
+                        <span class="meta">·</span>
+                        <span class="meta">playlist</span>
+                    {% endif %}
+                    {% if j.workers and j.workers > 1 %}
+                        <span class="meta">·</span>
+                        <span class="meta mono">{{ j.workers }}× paralelo</span>
+                    {% endif %}
+                    <span class="id">{{ j.id[:8] }}</span>
+                </a>
+            {% endfor %}
         </div>
     </div>
-
-    <div class="form-group">
-        <label class="form-label">Arquivo .txt com links:</label>
-        <input type="file" class="form-control" name="file" accept=".txt">
-        <small class="form-text">
-            Selecione um arquivo .txt contendo um link por linha.
-            Linhas iniciadas com <code>#</code> são ignoradas.
-        </small>
-    </div>
-
-    <div class="form-group">
-        <label class="form-label">Ou cole os links (um por linha):</label>
-        <textarea name="links" class="form-control" rows="8"
-                  placeholder="https://www.youtube.com/watch?v=exemplo1&#10;https://www.youtube.com/watch?v=exemplo2"></textarea>
-    </div>
-
-    <div class="form-group">
-        <label class="form-label">Pasta de destino:</label>
-        <input type="text" class="form-control" name="dest_path" value="{{ default_path }}">
-        <small class="form-text">
-            Caminho onde os vídeos serão salvos (deve estar dentro da raiz permitida).
-        </small>
-    </div>
-
-    <div class="text-center">
-        <button type="submit" class="btn btn-primary">
-            <i class="bi bi-download me-2"></i>Iniciar Download
-        </button>
-    </div>
-</form>
-
-{% if recent_jobs %}
-<div class="recent-jobs">
-    <h5><i class="bi bi-clock-history me-2"></i>Tarefas recentes</h5>
-    {% for j in recent_jobs %}
-        <a href="{{ url_for('status', job_id=j.id) }}">
-            <span class="badge {% if j.running %}bg-primary
-                              {% elif j.cancelled %}bg-secondary
-                              {% elif j.completed %}bg-success
-                              {% else %}bg-light text-dark{% endif %}">
-                {% if j.running %}Em andamento
-                {% elif j.cancelled %}Cancelado
-                {% elif j.completed %}Concluído
-                {% else %}—{% endif %}
-            </span>
-            <span class="ms-2">{{ j.total_links }} link(s)</span>
-            <span class="ms-2 text-muted">·</span>
-            <span class="ms-2">{{ j.format }}</span>
-            {% if j.is_playlist %}
-              <span class="ms-2 text-muted">· playlist</span>
-            {% endif %}
-            {% if j.workers and j.workers > 1 %}
-              <span class="ms-2 text-muted">· {{ j.workers }}× paralelo</span>
-            {% endif %}
-            <span class="float-end text-muted">{{ j.id[:8] }}</span>
-        </a>
-    {% endfor %}
+    {% endif %}
 </div>
-{% endif %}
 {% endblock %}

@@ -1,8 +1,8 @@
 # Video Downloader
 
 Aplicação Flask + yt-dlp para download de vídeos/playlists com interface
-web, **persistência em SQLite**, **downloads paralelos**, formatos
-múltiplos, cancelamento e histórico de jobs.
+web em **dark theme** (Geist + Geist Mono), persistência em SQLite,
+downloads paralelos, formatos múltiplos, cancelamento e histórico.
 
 ## 📋 Pré-requisitos
 

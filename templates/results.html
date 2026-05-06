@@ -1,71 +1,112 @@
 {% extends "base.html" %}
-{% block title %}Resultados do Download{% endblock %}
+{% block title %}Resultados · {{ status.id[:8] }}{% endblock %}
 
 {% block content %}
-<h1 class="text-center">Resultados do Download</h1>
+<div class="shell">
+    {% set ok_count = status.results | selectattr('success') | list | length %}
+    {% set fail_count = (status.results | length) - ok_count %}
 
-{% set ok_count = status.results | selectattr('success') | list | length %}
-{% set fail_count = (status.results | length) - ok_count %}
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <div class="eyebrow muted">Tarefa <span class="id-chip">{{ status.id[:8] }}</span></div>
+            <h1 class="title-display">Resultados</h1>
+        </div>
+        {% if status.cancelled %}
+            <span class="status-pill is-cancelled">cancelado</span>
+        {% elif fail_count == 0 and ok_count > 0 %}
+            <span class="status-pill is-completed">tudo certo</span>
+        {% else %}
+            <span class="status-pill is-cancelled" style="color: var(--warning); border-color: var(--warning);">
+                com falhas
+            </span>
+        {% endif %}
+    </div>
 
-{% if status.cancelled %}
-    <div class="alert alert-warning">
-        <i class="bi bi-x-circle-fill me-2"></i>
-        Download cancelado pelo usuário.
-        Sucesso: {{ ok_count }} · Falhas: {{ fail_count }}.
+    <!-- Stats -->
+    <div class="form-row-grid mb-4">
+        <div class="panel" style="margin-bottom:0">
+            <div class="panel-head">
+                <span class="panel-title">Sucesso</span>
+            </div>
+            <div style="font-size: 2.25rem; font-weight: 700; color: #2dd47e; font-family: var(--font-mono);">
+                {{ ok_count }}
+            </div>
+            <div class="text-muted small mono">de {{ status.results | length }} tentativas</div>
+        </div>
+        <div class="panel" style="margin-bottom:0">
+            <div class="panel-head">
+                <span class="panel-title">Falhas</span>
+            </div>
+            <div style="font-size: 2.25rem; font-weight: 700;
+                        color: {% if fail_count > 0 %}#f47174{% else %}var(--faint){% endif %};
+                        font-family: var(--font-mono);">
+                {{ fail_count }}
+            </div>
+            <div class="text-muted small mono">
+                {% if fail_count > 0 %}reveja a tabela abaixo
+                {% else %}sem erros registrados{% endif %}
+            </div>
+        </div>
     </div>
-{% elif fail_count == 0 %}
-    <div class="alert alert-success">
-        <i class="bi bi-check-circle-fill me-2"></i>
-        Todos os {{ ok_count }} download(s) concluídos com sucesso.
-    </div>
-{% else %}
-    <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        Concluído com falhas. Sucesso: {{ ok_count }} · Falhas: {{ fail_count }}.
-    </div>
-{% endif %}
 
-<div class="results-table">
-    <table class="table table-striped table-hover">
-        <thead>
-            <tr>
-                <th style="width: 80px;">Status</th>
-                <th>Título</th>
-                <th style="width: 350px;">URL</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for r in status.results %}
+    {% if status.cancelled %}
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span>Download interrompido. Os resultados abaixo são parciais.</span>
+        </div>
+    {% endif %}
+
+    <div class="results-table-wrap mb-4">
+        <table class="table">
+            <thead>
                 <tr>
-                    <td class="text-center">
-                        {% if r.success %}
-                            <i class="bi bi-check-circle-fill success-icon"
-                               title="Sucesso"></i>
-                        {% else %}
-                            <i class="bi bi-x-circle-fill error-icon"
-                               title="{{ r.message or 'Falha' }}"></i>
-                        {% endif %}
-                    </td>
-                    <td style="font-weight: 500;">
-                        {{ r.title or 'Não disponível' }}
-                        {% if not r.success and r.message %}
-                            <div class="small text-danger">{{ r.message }}</div>
-                        {% endif %}
-                    </td>
-                    <td class="url-cell" title="{{ r.link }}">{{ r.link }}</td>
+                    <th class="cell-status">Status</th>
+                    <th>Título</th>
+                    <th style="width: 380px;">URL</th>
                 </tr>
-            {% else %}
-                <tr><td colspan="3" class="text-center text-muted">
-                    Nenhum resultado registrado.
-                </td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                {% for r in status.results %}
+                    <tr>
+                        <td class="cell-status">
+                            {% if r.success %}
+                                <i class="bi bi-check-circle-fill icon-success"
+                                   title="Sucesso"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill icon-error"
+                                   title="{{ r.message or 'Falha' }}"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>{{ r.title or '—' }}</div>
+                            {% if not r.success and r.message %}
+                                <div class="small mono"
+                                     style="color:#f47174; margin-top: 4px;">
+                                    {{ r.message[:160] }}
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td class="url-cell" title="{{ r.link }}">{{ r.link }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted"
+                            style="padding: var(--sp-6);">
+                            Nenhum resultado registrado.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-<div class="text-center">
-    <a href="{{ url_for('index') }}" class="btn btn-primary">
-        <i class="bi bi-plus-circle me-2"></i>Nova Tarefa
-    </a>
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('status', job_id=status.id) }}" class="btn btn-ghost">
+            <i class="bi bi-arrow-left"></i><span>Status</span>
+        </a>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i><span>Nova tarefa</span>
+        </a>
+    </div>
 </div>
 {% endblock %}

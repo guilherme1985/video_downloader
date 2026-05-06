@@ -1,112 +1,129 @@
 {% extends "base.html" %}
-{% block title %}Status do Download{% endblock %}
+{% block title %}Status · {{ status.id[:8] }}{% endblock %}
 
 {% block content %}
-<h1 class="text-center">Status do Download</h1>
+<div class="shell">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <div class="eyebrow muted">Tarefa <span class="id-chip">{{ status.id[:8] }}</span></div>
+            <h1 class="title-display">Status do download</h1>
+        </div>
+        <span id="status-badge" class="status-pill
+            {% if status.running %}is-running
+            {% elif status.cancelled %}is-cancelled
+            {% elif status.completed %}is-completed
+            {% else %}is-cancelled{% endif %}">
+            <span id="status-text">
+                {% if status.running %}em andamento
+                {% elif status.cancelled %}cancelado
+                {% elif status.completed %}concluído
+                {% else %}aguardando{% endif %}
+            </span>
+        </span>
+    </div>
 
-<div class="text-center mb-4" id="status-section">
-    <span id="status-badge" class="badge status-badge
-        {% if status.running %}bg-primary
-        {% elif status.cancelled %}bg-secondary
-        {% elif status.completed %}bg-success
-        {% else %}bg-secondary{% endif %}">
-        {% if status.running %}
-            <i class="bi bi-arrow-clockwise me-2"></i>Download em andamento...
-        {% elif status.cancelled %}
-            <i class="bi bi-x-circle-fill me-2"></i>Cancelado
-        {% elif status.completed %}
-            <i class="bi bi-check-circle-fill me-2"></i>Download concluído!
-        {% else %}
-            <i class="bi bi-hourglass-split me-2"></i>Aguardando...
+    <div class="job-meta mb-4">
+        <span>{{ status.total_links }} link(s)</span>
+        <span class="sep">·</span>
+        <span>{{ status.format }}</span>
+        {% if status.is_playlist %}
+            <span class="sep">·</span><span>playlist</span>
         {% endif %}
-    </span>
-
-    <div class="job-meta mt-2 text-muted small">
-        {{ status.total_links }} link(s)
-        · formato: {{ status.format }}
-        {% if status.is_playlist %} · playlist{% endif %}
         {% if status.workers and status.workers > 1 %}
-            · <span id="workers-count">{{ status.workers }}</span>× paralelo
+            <span class="sep">·</span>
+            <span><span id="workers-count">{{ status.workers }}</span>× paralelo</span>
         {% endif %}
+        <span class="sep">·</span>
+        <span>destino: {{ status.dest_path }}</span>
     </div>
 
-    <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
-        <a id="btn-results" href="{{ url_for('results', job_id=status.id) }}"
-           class="btn btn-success {% if status.running %}d-none{% endif %}">
-            <i class="bi bi-list-check me-2"></i>Ver Resultados
-        </a>
-        <button id="btn-cancel" class="btn btn-outline-danger
-                {% if not status.running %}d-none{% endif %}"
-                onclick="cancelJob()">
-            <i class="bi bi-stop-circle me-2"></i>Cancelar
-        </button>
-    </div>
-</div>
-
-<div class="progress-container">
-    <h5>
-        Progresso Geral:
-        <span id="progress-text">{{ status.done_count }} de {{ status.total_links }}</span>
-    </h5>
-    <div class="progress mb-3">
-        <div id="total-progress-bar"
-             class="progress-bar progress-bar-striped {% if status.running %}progress-bar-animated{% endif %}"
-             role="progressbar"
-             style="width: {{ ((status.done_count / status.total_links * 100)|round(0))
-                              if status.total_links > 0 else 0 }}%">
-            {{ ((status.done_count / status.total_links * 100)|round(0)|int)
-                if status.total_links > 0 else 0 }}%
+    <!-- Progresso geral -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Progresso geral</span>
+            <span id="progress-text" class="mono small text-muted">
+                {{ status.done_count }} / {{ status.total_links }}
+            </span>
+        </div>
+        <div class="progress-line primary">
+            <div id="total-progress-bar" class="bar"
+                 style="width: {{ ((status.done_count / status.total_links * 100)|round(0))
+                                  if status.total_links > 0 else 0 }}%"></div>
+        </div>
+        <div class="progress-meta">
+            <span id="progress-pct" class="pct">
+                {{ ((status.done_count / status.total_links * 100)|round(0)|int)
+                    if status.total_links > 0 else 0 }}%
+            </span>
+            {% set remaining = status.total_links - status.done_count %}
+            <span id="progress-remaining">{{ remaining }} restantes</span>
         </div>
     </div>
 
-    <h5 class="mt-4">
-        <i class="bi bi-cpu me-2"></i>Downloads ativos
-        <span id="active-count" class="text-muted small">
-            ({{ status.active|length if status.active else 0 }})
-        </span>
-    </h5>
-    <div id="active-downloads">
-        {% if status.active %}
-            {% for slot in status.active %}
-                <div class="active-slot" data-link="{{ slot.link }}">
-                    <div class="current-title">
-                        <i class="bi bi-film me-2"></i>{{ slot.title or 'Preparando...' }}
-                    </div>
-                    <div class="progress">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                             role="progressbar"
-                             style="width: {{ slot.percent|round(0) }}%">
-                            {{ slot.percent|round(0)|int }}%
+    <!-- Downloads ativos -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">
+                Downloads ativos
+                <span id="active-count" class="text-muted">
+                    ({{ status.active|length if status.active else 0 }})
+                </span>
+            </span>
+            <button id="btn-cancel" class="btn btn-outline-danger
+                    {% if not status.running %}d-none{% endif %}"
+                    onclick="cancelJob()" type="button"
+                    style="padding: 4px 12px; font-size: 0.8rem;">
+                <i class="bi bi-stop-circle"></i>
+                <span>Cancelar</span>
+            </button>
+        </div>
+        <div id="active-downloads">
+            {% if status.active %}
+                {% for slot in status.active %}
+                    <div class="slot" data-link="{{ slot.link }}">
+                        <div class="slot-title">{{ slot.title or 'Preparando...' }}</div>
+                        <div class="progress-line">
+                            <div class="bar" style="width: {{ slot.percent|round(0) }}%"></div>
+                        </div>
+                        <div class="progress-meta">
+                            <span class="pct">{{ slot.percent|round(0)|int }}%</span>
+                            <span class="text-faint">baixando</span>
                         </div>
                     </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-muted small mono" id="no-active">
+                    {% if status.completed %}— sem atividade —
+                    {% else %}aguardando início...{% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Mensagens -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Log de eventos</span>
+        </div>
+        <div id="messages-log" class="log">
+            {% for msg in status.messages[-100:] %}
+                <div class="log-row {{ msg.type }}">
+                    <span class="ts"></span>
+                    <span class="msg">{{ msg.message }}</span>
                 </div>
             {% endfor %}
-        {% else %}
-            <div class="text-muted small" id="no-active">
-                {% if status.completed %}—{% else %}Aguardando início...{% endif %}
-            </div>
-        {% endif %}
+        </div>
     </div>
-</div>
 
-<div class="messages-container">
-    <h5><i class="bi bi-chat-left-text me-2"></i>Mensagens:</h5>
-    <div id="messages-log">
-        {% for msg in status.messages[-100:] %}
-            <div class="text-{{ 'danger' if msg.type == 'error'
-                              else 'warning' if msg.type == 'warning'
-                              else 'success' if msg.type == 'success'
-                              else 'info' }}">
-                {{ msg.message }}
-            </div>
-        {% endfor %}
+    <div class="d-flex justify-content-between mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-ghost">
+            <i class="bi bi-arrow-left"></i><span>Voltar</span>
+        </a>
+        <a id="btn-results" href="{{ url_for('results', job_id=status.id) }}"
+           class="btn btn-success {% if status.running %}d-none{% endif %}">
+            <i class="bi bi-list-check"></i><span>Ver resultados</span>
+        </a>
     </div>
-</div>
-
-<div class="text-center">
-    <a href="{{ url_for('index') }}" class="btn btn-primary">
-        <i class="bi bi-arrow-left me-2"></i>Voltar
-    </a>
 </div>
 {% endblock %}
 
@@ -133,15 +150,14 @@
         countEl.textContent = `(${active.length})`;
 
         if (active.length === 0) {
-            container.innerHTML = `<div class="text-muted small" id="no-active">
-                Aguardando próximo...
+            container.innerHTML = `<div class="text-muted small mono" id="no-active">
+                aguardando próximo...
             </div>`;
             return;
         }
 
-        // Diff por link: atualiza in-place quando possível, evitando flicker.
         const existing = {};
-        for (const el of container.querySelectorAll('.active-slot')) {
+        for (const el of container.querySelectorAll('.slot')) {
             existing[el.dataset.link] = el;
         }
         const seen = new Set();
@@ -153,28 +169,26 @@
             let el = existing[slot.link];
             if (!el) {
                 el = document.createElement('div');
-                el.className = 'active-slot';
+                el.className = 'slot';
                 el.dataset.link = slot.link;
                 el.innerHTML = `
-                    <div class="current-title">
-                        <i class="bi bi-film me-2"></i><span class="t"></span>
+                    <div class="slot-title"></div>
+                    <div class="progress-line">
+                        <div class="bar"></div>
                     </div>
-                    <div class="progress">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                             role="progressbar"></div>
+                    <div class="progress-meta">
+                        <span class="pct">0%</span>
+                        <span class="text-faint">baixando</span>
                     </div>`;
                 container.appendChild(el);
             }
-            el.querySelector('.t').textContent = title;
-            const bar = el.querySelector('.progress-bar');
-            bar.style.width = `${pct}%`;
-            bar.textContent = `${pct}%`;
+            el.querySelector('.slot-title').textContent = title;
+            el.querySelector('.bar').style.width = `${pct}%`;
+            el.querySelector('.pct').textContent = `${pct}%`;
         }
-        // Remove os que terminaram
         for (const link in existing) {
             if (!seen.has(link)) existing[link].remove();
         }
-        // Garante que o "no-active" não fica preso
         const stale = document.getElementById('no-active');
         if (stale) stale.remove();
     }
@@ -182,54 +196,54 @@
     function applyState(data) {
         // Progresso total
         document.getElementById('progress-text').textContent =
-            `${data.done_count} de ${data.total_links}`;
+            `${data.done_count} / ${data.total_links}`;
         const totalBar = document.getElementById('total-progress-bar');
         const totalPct = data.total_links > 0
             ? Math.round(data.done_count / data.total_links * 100) : 0;
         totalBar.style.width = `${totalPct}%`;
-        totalBar.textContent = `${totalPct}%`;
+        document.getElementById('progress-pct').textContent = `${totalPct}%`;
+        document.getElementById('progress-remaining').textContent =
+            `${Math.max(0, data.total_links - data.done_count)} restantes`;
 
         // Ativos
         renderActive(data.active || []);
 
         // Mensagens
         const log = document.getElementById('messages-log');
-        const wasNearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 50;
+        const wasNearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
         log.innerHTML = '';
         for (const msg of (data.messages || []).slice(-100)) {
-            const div = document.createElement('div');
-            const cls = msg.type === 'error' ? 'danger'
-                      : msg.type === 'warning' ? 'warning'
-                      : msg.type === 'success' ? 'success' : 'info';
-            div.className = `text-${cls}`;
-            const ts = msg.ts ? `<span class="ts">${fmtTs(msg.ts)}</span>` : '';
-            div.innerHTML = `${ts}${escapeHtml(msg.message || '')}`;
-            log.appendChild(div);
+            const row = document.createElement('div');
+            row.className = `log-row ${msg.type || 'info'}`;
+            const ts = msg.ts ? fmtTs(msg.ts) : '';
+            row.innerHTML = `
+                <span class="ts">${ts}</span>
+                <span class="msg">${escapeHtml(msg.message || '')}</span>`;
+            log.appendChild(row);
         }
         if (wasNearBottom) log.scrollTop = log.scrollHeight;
 
-        // Badge / botões
+        // Pill / botões
         const badge = document.getElementById('status-badge');
+        const text = document.getElementById('status-text');
         const btnResults = document.getElementById('btn-results');
         const btnCancel = document.getElementById('btn-cancel');
-        badge.classList.remove('bg-primary','bg-success','bg-secondary');
+        badge.classList.remove('is-running', 'is-completed', 'is-cancelled');
         if (data.running) {
-            badge.classList.add('bg-primary');
-            badge.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Download em andamento...';
+            badge.classList.add('is-running');
+            text.textContent = 'em andamento';
             btnResults.classList.add('d-none');
             btnCancel.classList.remove('d-none');
         } else if (data.cancelled) {
-            badge.classList.add('bg-secondary');
-            badge.innerHTML = '<i class="bi bi-x-circle-fill me-2"></i>Cancelado';
+            badge.classList.add('is-cancelled');
+            text.textContent = 'cancelado';
             btnResults.classList.remove('d-none');
             btnCancel.classList.add('d-none');
-            totalBar.classList.remove('progress-bar-animated');
         } else if (data.completed) {
-            badge.classList.add('bg-success');
-            badge.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Download concluído!';
+            badge.classList.add('is-completed');
+            text.textContent = 'concluído';
             btnResults.classList.remove('d-none');
             btnCancel.classList.add('d-none');
-            totalBar.classList.remove('progress-bar-animated');
         }
 
         if (!data.running && pollInterval !== null) {
@@ -247,10 +261,15 @@
     }
 
     async function cancelJob() {
-        if (!confirm('Tem certeza que deseja cancelar este download?')) return;
+        if (!confirm('Cancelar este download?')) return;
         await fetch(`/api/cancel/${JOB_ID}`, { method: 'POST' });
         updateStatus();
     }
+
+    // Hidrata timestamps do server-render iniciais (jinja não tem acesso a fmtTs)
+    document.querySelectorAll('#messages-log .log-row .ts').forEach(el => {
+        if (!el.textContent.trim()) el.textContent = '';
+    });
 
     updateStatus();
     pollInterval = setInterval(updateStatus, 2000);

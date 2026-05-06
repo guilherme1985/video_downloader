@@ -424,7 +424,15 @@ def index():
 @app.route("/status/<job_id>")
 def status(job_id):
     job = _get_job_or_404(job_id)
-    return render_template("status.html", status=job)
+    # Para o template, normaliza `active` (dict em memória) para list,
+    # igual ao formato exposto pela API. Cópia rasa para não mutar o estado.
+    view = dict(job)
+    active = job.get("active") or {}
+    view["active"] = (
+        [{"link": k, **v} for k, v in active.items()]
+        if isinstance(active, dict) else active
+    )
+    return render_template("status.html", status=view)
 
 
 @app.route("/results/<job_id>")
