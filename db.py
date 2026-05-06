@@ -129,6 +129,22 @@ class JobStore:
                 raise
             return len(zombie_ids)
 
+    def delete_job(self, job_id: str) -> bool:
+        """Apaga um job e seus dados (cascata em messages/results)."""
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM jobs WHERE id=?", (job_id,)
+            )
+            return cur.rowcount > 0
+
+    def delete_finished(self) -> int:
+        """Apaga todos os jobs que não estão running."""
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM jobs WHERE running=0"
+            )
+            return cur.rowcount
+
     def list_recent(self, limit: int = 20) -> list:
         with self._lock:
             rows = self._conn.execute(

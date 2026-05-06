@@ -1,6 +1,6 @@
-/*============================================================
- Video Downloader — design system (dark-only, Geist)                                    *
- ============================================================ */
+/* ============================================================
+   Video Downloader — design system (dark-only, Geist)
+   ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&display=swap');
 
@@ -52,8 +52,8 @@
 }
 
 /* ============================================================
- R eset & base                                                                           *
- ============================================================ */
+   Reset & base
+   ============================================================ */
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
@@ -78,8 +78,8 @@ code, pre, .mono {
 }
 
 /* ============================================================
- L ayout                                                                                 *
- ============================================================ */
+   Layout
+   ============================================================ */
 .wrap {
     max-width: 920px;
     margin: 0 auto;
@@ -112,8 +112,8 @@ code, pre, .mono {
 }
 
 /* ============================================================
- T ypography                                                                             *
- ============================================================ */
+   Typography
+   ============================================================ */
 .eyebrow {
     font-size: var(--fs-xs);
     letter-spacing: 0.18em;
@@ -164,8 +164,8 @@ h5.section-title {
 .small { font-size: var(--fs-sm); }
 
 /* ============================================================
- F orms                                                                                  *
- ============================================================ */
+   Forms
+   ============================================================ */
 .field { margin-bottom: var(--sp-5); }
 
 .field-label {
@@ -321,8 +321,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* ============================================================
- B uttons                                                                                *
- ============================================================ */
+   Buttons
+   ============================================================ */
 .btn,
 .btn-primary,
 .btn-success,
@@ -384,8 +384,8 @@ input[type="file"]::file-selector-button:hover {
 .btn-ghost:hover { background: var(--bg-soft); color: var(--text); }
 
 /* ============================================================
- P anel (card aninhado)                                                                  *
- ============================================================ */
+   Panel (card aninhado)
+   ============================================================ */
 .panel {
     background: var(--bg-soft);
     border: 1px solid var(--border-soft);
@@ -416,8 +416,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* ============================================================
- P rogress                                                                               *
- ============================================================ */
+   Progress
+   ============================================================ */
 .progress-line {
     height: 6px;
     background: var(--bg-page);
@@ -478,8 +478,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* ============================================================
- S tatus badge                                                                           *
- ============================================================ */
+   Status badge
+   ============================================================ */
 .status-pill {
     display: inline-flex;
     align-items: center;
@@ -523,8 +523,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* ============================================================
- L og                                                                                    *
- ============================================================ */
+   Log
+   ============================================================ */
 .log {
     background: var(--bg-page);
     border: 1px solid var(--border-soft);
@@ -558,8 +558,8 @@ input[type="file"]::file-selector-button:hover {
 .log::-webkit-scrollbar-thumb:hover { background: var(--faint); }
 
 /* ============================================================
- T ables                                                                                 *
- ============================================================ */
+   Tables
+   ============================================================ */
 .results-table-wrap {
     border: 1px solid var(--border-soft);
     border-radius: var(--r-lg);
@@ -611,8 +611,8 @@ input[type="file"]::file-selector-button:hover {
 .cell-status  { width: 2.5rem; text-align: center; }
 
 /* ============================================================
- A lerts                                                                                 *
- ============================================================ */
+   Alerts
+   ============================================================ */
 .alert {
     padding: var(--sp-3) var(--sp-4);
     border-radius: var(--r-md);
@@ -645,8 +645,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* ============================================================
- R ecent jobs (home)                                                                     *
- ============================================================ */
+   Recent jobs (home)
+   ============================================================ */
 .recent-jobs {
     margin-top: var(--sp-8);
     padding-top: var(--sp-5);
@@ -660,22 +660,29 @@ input[type="file"]::file-selector-button:hover {
 }
 .recent-item {
     display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
+    align-items: stretch;
     background: var(--bg-soft);
     border: 1px solid var(--border-soft);
     border-radius: var(--r-md);
-    text-decoration: none;
-    color: var(--text);
-    font-size: var(--fs-sm);
+    overflow: hidden;
     transition: border-color 0.15s, background 0.15s;
 }
 .recent-item:hover {
     border-color: var(--border);
     background: var(--bg-softer);
-    color: var(--text);
 }
+.recent-item-link {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    text-decoration: none;
+    color: var(--text);
+    font-size: var(--fs-sm);
+    min-width: 0;
+}
+.recent-item-link:hover { color: var(--text); }
 .recent-item .pill {
     font-size: var(--fs-xs);
     padding: 2px var(--sp-2);
@@ -700,9 +707,50 @@ input[type="file"]::file-selector-button:hover {
     font-size: var(--fs-xs);
 }
 
+/* Botão de remover individual */
+.btn-icon-danger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--border-soft);
+    color: var(--faint);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    font-size: var(--fs-md);
+}
+.btn-icon-danger:hover {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+}
+
+/* Botão de texto (Limpar concluídas) */
+.btn-link-muted {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--muted);
+    cursor: pointer;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-sm);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-link-muted:hover {
+    background: rgba(220, 53, 69, 0.08);
+    color: var(--danger);
+    border-color: rgba(220, 53, 69, 0.2);
+}
+
 /* ============================================================
- J ob meta line (status page)                                                            *
- ============================================================ */
+   Job meta line (status page)
+   ============================================================ */
 .job-meta {
     display: flex;
     flex-wrap: wrap;
@@ -725,8 +773,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* ============================================================
- U tility                                                                                *
- ============================================================ */
+   Utility
+   ============================================================ */
 .d-none { display: none !important; }
 .d-flex { display: flex; }
 .flex-wrap { flex-wrap: wrap; }

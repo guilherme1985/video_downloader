@@ -462,6 +462,38 @@ def api_cancel(job_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/jobs/<job_id>", methods=["DELETE"])
+def api_delete_job(job_id):
+    """Apaga um job individual. Recusa se ainda estiver em execução."""
+    with jobs_lock:
+        live = jobs.get(job_id)
+        if live is not None and live.get("running"):
+            return jsonify({
+                "ok": False,
+                "error": "still_running",
+                "message": "Cancele a tarefa antes de remover.",
+            }), 409
+        # Remove da memória se estiver lá
+        jobs.pop(job_id, None)
+
+    deleted = store.delete_job(job_id)
+    if not deleted:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/jobs", methods=["DELETE"])
+def api_delete_finished():
+    """Apaga todas as tarefas que não estão em execução."""
+    with jobs_lock:
+        # Remove da memória os finalizados
+        finished_ids = [jid for jid, j in jobs.items() if not j.get("running")]
+        for jid in finished_ids:
+            jobs.pop(jid, None)
+    n = store.delete_finished()
+    return jsonify({"ok": True, "deleted": n})
+
+
 @app.errorhandler(413)
 def too_large(_e):
     flash(f"Upload excede o limite de {MAX_UPLOAD_MB} MB.", "danger")
