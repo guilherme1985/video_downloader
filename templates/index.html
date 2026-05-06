@@ -21,16 +21,27 @@
         </div>
     </div>
 
-    <div class="form-group">
-        <label class="form-label" for="format">Formato / Qualidade:</label>
-        <select class="form-select" id="format" name="format">
-            <option value="best" selected>Melhor disponível (vídeo)</option>
-            <option value="1080p">Vídeo até 1080p</option>
-            <option value="720p">Vídeo até 720p</option>
-            <option value="480p">Vídeo até 480p</option>
-            <option value="audio_mp3">Apenas áudio — MP3</option>
-            <option value="audio_m4a">Apenas áudio — M4A</option>
-        </select>
+    <div class="row">
+        <div class="col-md-8 form-group">
+            <label class="form-label" for="format">Formato / Qualidade:</label>
+            <select class="form-select" id="format" name="format">
+                <option value="best" selected>Melhor disponível (vídeo)</option>
+                <option value="1080p">Vídeo até 1080p</option>
+                <option value="720p">Vídeo até 720p</option>
+                <option value="480p">Vídeo até 480p</option>
+                <option value="audio_mp3">Apenas áudio — MP3</option>
+                <option value="audio_m4a">Apenas áudio — M4A</option>
+            </select>
+        </div>
+        <div class="col-md-4 form-group">
+            <label class="form-label" for="workers">
+                Downloads paralelos:
+            </label>
+            <input type="number" class="form-control" id="workers"
+                   name="workers" min="1" max="{{ max_workers }}"
+                   value="{{ default_workers }}">
+            <small class="form-text">1 = sequencial · máx. {{ max_workers }}</small>
+        </div>
     </div>
 
     <div class="form-group">
@@ -82,6 +93,9 @@
             <span class="ms-2">{{ j.format }}</span>
             {% if j.is_playlist %}
               <span class="ms-2 text-muted">· playlist</span>
+            {% endif %}
+            {% if j.workers and j.workers > 1 %}
+              <span class="ms-2 text-muted">· {{ j.workers }}× paralelo</span>
             {% endif %}
             <span class="float-end text-muted">{{ j.id[:8] }}</span>
         </a>

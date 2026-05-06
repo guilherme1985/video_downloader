@@ -21,6 +21,15 @@
         {% endif %}
     </span>
 
+    <div class="job-meta mt-2 text-muted small">
+        {{ status.total_links }} link(s)
+        · formato: {{ status.format }}
+        {% if status.is_playlist %} · playlist{% endif %}
+        {% if status.workers and status.workers > 1 %}
+            · <span id="workers-count">{{ status.workers }}</span>× paralelo
+        {% endif %}
+    </div>
+
     <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
         <a id="btn-results" href="{{ url_for('results', job_id=status.id) }}"
            class="btn btn-success {% if status.running %}d-none{% endif %}">
@@ -37,29 +46,46 @@
 <div class="progress-container">
     <h5>
         Progresso Geral:
-        <span id="progress-text">{{ status.current_link }} de {{ status.total_links }}</span>
+        <span id="progress-text">{{ status.done_count }} de {{ status.total_links }}</span>
     </h5>
     <div class="progress mb-3">
         <div id="total-progress-bar"
              class="progress-bar progress-bar-striped {% if status.running %}progress-bar-animated{% endif %}"
              role="progressbar"
-             style="width: {{ ((status.current_link / status.total_links * 100)|round(0))
+             style="width: {{ ((status.done_count / status.total_links * 100)|round(0))
                               if status.total_links > 0 else 0 }}%">
-            {{ ((status.current_link / status.total_links * 100)|round(0)|int)
+            {{ ((status.done_count / status.total_links * 100)|round(0)|int)
                 if status.total_links > 0 else 0 }}%
         </div>
     </div>
 
-    <div id="current-title" class="current-title">
-        <i class="bi bi-film me-2"></i>{{ status.current_title or 'Preparando...' }}
-    </div>
-    <div class="progress">
-        <div id="current-progress-bar"
-             class="progress-bar progress-bar-striped {% if status.running %}progress-bar-animated{% endif %} bg-success"
-             role="progressbar"
-             style="width: {{ status.current_percent|round(0) }}%">
-            {{ status.current_percent|round(0)|int }}%
-        </div>
+    <h5 class="mt-4">
+        <i class="bi bi-cpu me-2"></i>Downloads ativos
+        <span id="active-count" class="text-muted small">
+            ({{ status.active|length if status.active else 0 }})
+        </span>
+    </h5>
+    <div id="active-downloads">
+        {% if status.active %}
+            {% for slot in status.active %}
+                <div class="active-slot" data-link="{{ slot.link }}">
+                    <div class="current-title">
+                        <i class="bi bi-film me-2"></i>{{ slot.title or 'Preparando...' }}
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                             role="progressbar"
+                             style="width: {{ slot.percent|round(0) }}%">
+                            {{ slot.percent|round(0)|int }}%
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="text-muted small" id="no-active">
+                {% if status.completed %}—{% else %}Aguardando início...{% endif %}
+            </div>
+        {% endif %}
     </div>
 </div>
 
@@ -92,36 +118,85 @@
     function fmtTs(ts) {
         if (!ts) return '';
         const d = new Date(ts * 1000);
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit',
-                                          second: '2-digit' });
+        return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    }
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+            '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        }[c]));
+    }
+
+    function renderActive(active) {
+        const container = document.getElementById('active-downloads');
+        const countEl = document.getElementById('active-count');
+        countEl.textContent = `(${active.length})`;
+
+        if (active.length === 0) {
+            container.innerHTML = `<div class="text-muted small" id="no-active">
+                Aguardando próximo...
+            </div>`;
+            return;
+        }
+
+        // Diff por link: atualiza in-place quando possível, evitando flicker.
+        const existing = {};
+        for (const el of container.querySelectorAll('.active-slot')) {
+            existing[el.dataset.link] = el;
+        }
+        const seen = new Set();
+
+        for (const slot of active) {
+            seen.add(slot.link);
+            const pct = Math.round(slot.percent || 0);
+            const title = slot.title || 'Preparando...';
+            let el = existing[slot.link];
+            if (!el) {
+                el = document.createElement('div');
+                el.className = 'active-slot';
+                el.dataset.link = slot.link;
+                el.innerHTML = `
+                    <div class="current-title">
+                        <i class="bi bi-film me-2"></i><span class="t"></span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                             role="progressbar"></div>
+                    </div>`;
+                container.appendChild(el);
+            }
+            el.querySelector('.t').textContent = title;
+            const bar = el.querySelector('.progress-bar');
+            bar.style.width = `${pct}%`;
+            bar.textContent = `${pct}%`;
+        }
+        // Remove os que terminaram
+        for (const link in existing) {
+            if (!seen.has(link)) existing[link].remove();
+        }
+        // Garante que o "no-active" não fica preso
+        const stale = document.getElementById('no-active');
+        if (stale) stale.remove();
     }
 
     function applyState(data) {
-        // Texto e barras
+        // Progresso total
         document.getElementById('progress-text').textContent =
-            `${data.current_link} de ${data.total_links}`;
-
+            `${data.done_count} de ${data.total_links}`;
         const totalBar = document.getElementById('total-progress-bar');
         const totalPct = data.total_links > 0
-            ? Math.round(data.current_link / data.total_links * 100)
-            : 0;
+            ? Math.round(data.done_count / data.total_links * 100) : 0;
         totalBar.style.width = `${totalPct}%`;
         totalBar.textContent = `${totalPct}%`;
 
-        const curBar = document.getElementById('current-progress-bar');
-        const curPct = Math.round(data.current_percent || 0);
-        curBar.style.width = `${curPct}%`;
-        curBar.textContent = `${curPct}%`;
+        // Ativos
+        renderActive(data.active || []);
 
-        document.getElementById('current-title').innerHTML =
-            `<i class="bi bi-film me-2"></i>${data.current_title || 'Preparando...'}`;
-
-        // Mensagens (últimas 100, com timestamp)
+        // Mensagens
         const log = document.getElementById('messages-log');
         const wasNearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 50;
         log.innerHTML = '';
-        const recent = data.messages.slice(-100);
-        for (const msg of recent) {
+        for (const msg of (data.messages || []).slice(-100)) {
             const div = document.createElement('div');
             const cls = msg.type === 'error' ? 'danger'
                       : msg.type === 'warning' ? 'warning'
@@ -133,12 +208,11 @@
         }
         if (wasNearBottom) log.scrollTop = log.scrollHeight;
 
-        // Badge e botões
+        // Badge / botões
         const badge = document.getElementById('status-badge');
         const btnResults = document.getElementById('btn-results');
         const btnCancel = document.getElementById('btn-cancel');
-
-        badge.classList.remove('bg-primary', 'bg-success', 'bg-secondary');
+        badge.classList.remove('bg-primary','bg-success','bg-secondary');
         if (data.running) {
             badge.classList.add('bg-primary');
             badge.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Download em andamento...';
@@ -149,31 +223,19 @@
             badge.innerHTML = '<i class="bi bi-x-circle-fill me-2"></i>Cancelado';
             btnResults.classList.remove('d-none');
             btnCancel.classList.add('d-none');
+            totalBar.classList.remove('progress-bar-animated');
         } else if (data.completed) {
             badge.classList.add('bg-success');
             badge.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Download concluído!';
             btnResults.classList.remove('d-none');
             btnCancel.classList.add('d-none');
-        }
-
-        // Tira animação das barras quando termina
-        if (!data.running) {
             totalBar.classList.remove('progress-bar-animated');
-            curBar.classList.remove('progress-bar-animated');
         }
 
-        // Para o polling
         if (!data.running && pollInterval !== null) {
             clearInterval(pollInterval);
             pollInterval = null;
         }
-    }
-
-    function escapeHtml(s) {
-        return String(s).replace(/[&<>"']/g, c => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;',
-            '"': '&quot;', "'": '&#39;',
-        }[c]));
     }
 
     async function updateStatus() {
@@ -181,7 +243,7 @@
             const r = await fetch(`/api/status/${JOB_ID}`);
             if (!r.ok) return;
             applyState(await r.json());
-        } catch (_) { /* ignora erro transitório de rede */ }
+        } catch (_) {}
     }
 
     async function cancelJob() {

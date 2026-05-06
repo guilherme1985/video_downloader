@@ -242,6 +242,20 @@ input[type="file"]::file-selector-button:hover { background-color: #0b5ed7; }
     color: var(--text-primary);
     font-size: 1.1rem;
 }
+.active-slot {
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--log-bg);
+}
+.active-slot:last-child { margin-bottom: 0; }
+.active-slot .current-title {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+#active-downloads { margin-bottom: 1rem; }
+.job-meta { letter-spacing: 0.02em; }
 #progress-text { color: #0d6efd; font-weight: 700; }
 
 #messages-log {

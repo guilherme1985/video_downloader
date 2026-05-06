@@ -23,8 +23,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia o resto do projeto
 COPY --chown=app:app . /app
 
-# Diretório de download (será montado via volume; só garantimos existir)
-RUN mkdir -p /mnt/nas/Downloads && chown -R app:app /mnt/nas/Downloads
+# Diretórios para download (volume) e DB persistente
+RUN mkdir -p /mnt/nas/Downloads /data \
+    && chown -R app:app /mnt/nas/Downloads /data
 
 USER app
 

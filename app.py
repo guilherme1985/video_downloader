@@ -1,18 +1,19 @@
 """
-app.py — Flask web app para download de vídeos via yt-dlp.
+app.py — Flask + ThreadPoolExecutor + SQLite.
 
-Mudanças vs. versão original:
-  - Estado por job (UUID), não global compartilhado.
-  - Import direto de download_videos (sem subprocess + parse JSON).
-  - Validação de path e secure_filename para uploads.
-  - Configuração via variáveis de ambiente.
-  - Suporte a formato/qualidade e cancelamento.
+Modelo de dados em memória (jobs[id]):
+  Estado transitório que NÃO vai para o DB:
+    - active: dict {link: {title, percent}} dos workers em execução agora.
+    - done_count: contador rápido (= len(results)).
+
+Todo o resto (mensagens, resultados finalizados, flags) é persistido.
 """
 import os
 import time
 import uuid
 import threading
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, Future
 from collections import OrderedDict
 from urllib.parse import urlparse
 
@@ -23,21 +24,26 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 import download_videos
+from db import JobStore
 
 
 # ---------------------------------------------------------------------------
-# Configuração via env (com defaults razoáveis)
+# Configuração
 # ---------------------------------------------------------------------------
 DEFAULT_DOWNLOAD_PATH = os.environ.get("DEFAULT_DOWNLOAD_PATH", "/mnt/nas/Downloads")
 ALLOWED_DOWNLOAD_ROOT = os.environ.get("ALLOWED_DOWNLOAD_ROOT", DEFAULT_DOWNLOAD_PATH)
+DB_PATH = os.environ.get("DB_PATH", "/data/jobs.db")
 SECRET_KEY = os.environ.get("SECRET_KEY") or os.urandom(32).hex()
+
 MAX_LINKS = int(os.environ.get("MAX_LINKS", "500"))
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "1"))
-MAX_JOBS_KEPT = int(os.environ.get("MAX_JOBS_KEPT", "20"))
+MAX_JOBS_KEPT = int(os.environ.get("MAX_JOBS_KEPT", "50"))
+MAX_WORKERS = int(os.environ.get("MAX_WORKERS", "10"))
+DEFAULT_WORKERS = int(os.environ.get("DEFAULT_WORKERS", "1"))
 DEBUG = os.environ.get("FLASK_DEBUG", "0") == "1"
 
 ALLOWED_FORMATS = {
-    "best", "1080p", "720p", "480p", "audio_mp3", "audio_m4a"
+    "best", "1080p", "720p", "480p", "audio_mp3", "audio_m4a",
 }
 
 app = Flask(__name__)
@@ -46,96 +52,97 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 
 # ---------------------------------------------------------------------------
-# Estado de jobs (com lock)
+# Persistência + estado em memória
 # ---------------------------------------------------------------------------
+store = JobStore(DB_PATH)
+_zombies = store.cleanup_zombies()
+if _zombies:
+    app.logger.warning(f"{_zombies} job(s) zumbi(s) marcados como cancelados.")
+store.prune_old(keep=MAX_JOBS_KEPT)
+
 jobs_lock = threading.Lock()
+# Só jobs em execução (ou recentes) ficam em memória; os demais
+# são lidos sob demanda do DB.
 jobs: "OrderedDict[str, dict]" = OrderedDict()
 
 
-def _new_job() -> dict:
-    """Cria um job com TODAS as chaves preenchidas (corrige bug do template)."""
+def _new_job(workers: int, total_links: int, fmt: str,
+             is_playlist: bool, dest_path: str) -> dict:
     return {
         "id": str(uuid.uuid4()),
-        "running": False,
+        "running": True,
         "completed": False,
         "cancelled": False,
-        "total_links": 0,
-        "current_link": 0,
-        "current_percent": 0,
-        "current_title": "",
-        "current_link_url": "",
-        "links_status": {},
+        "created_at": time.time(),
+        "finished_at": None,
+        "total_links": total_links,
+        "format": fmt,
+        "is_playlist": is_playlist,
+        "dest_path": dest_path,
+        "workers": workers,
+        # Transitório (não persistido):
+        "active": {},          # link -> {title, percent}
+        "done_count": 0,
+        # Persistido sob demanda; também cacheado em memória:
         "messages": [],
         "results": [],
-        "created_at": time.time(),
-        "format": "best",
-        "is_playlist": False,
-        "dest_path": "",
+        # Controle interno:
+        "_executor": None,
+        "_futures": [],
     }
 
 
 def _register_job(job: dict) -> None:
     with jobs_lock:
         jobs[job["id"]] = job
-        # Mantém só os N mais recentes (LRU)
-        while len(jobs) > MAX_JOBS_KEPT:
-            jobs.popitem(last=False)
+        # Mantém só os mais recentes em memória, mas nunca despeja running
+        for old_id in list(jobs.keys()):
+            if len(jobs) <= MAX_JOBS_KEPT:
+                break
+            if not jobs[old_id].get("running"):
+                jobs.pop(old_id, None)
 
 
-def _get_job(job_id: str) -> dict:
+def _get_job_or_404(job_id: str) -> dict:
+    """Retorna o job vivo (em memória) ou um snapshot do DB."""
     with jobs_lock:
         job = jobs.get(job_id)
-    if job is None:
+    if job is not None:
+        return job
+
+    persisted = store.get_job(job_id)
+    if persisted is None:
         abort(404)
-    return job
+
+    # Snapshot read-only com campos esperados pelos templates
+    persisted["active"] = {}
+    persisted["done_count"] = len(persisted["results"])
+    return persisted
 
 
-def _recent_jobs(limit: int = 5) -> list:
+def _is_cancelled(job_id: str) -> bool:
     with jobs_lock:
-        items = list(jobs.values())[-limit:][::-1]
-        return [
-            {
-                "id": j["id"],
-                "created_at": j["created_at"],
-                "total_links": j["total_links"],
-                "running": j["running"],
-                "completed": j["completed"],
-                "cancelled": j["cancelled"],
-                "format": j["format"],
-                "is_playlist": j["is_playlist"],
-            }
-            for j in items
-        ]
+        job = jobs.get(job_id)
+        return job is None or job.get("cancelled", False)
 
 
 # ---------------------------------------------------------------------------
-# Validações de segurança
+# Validações
 # ---------------------------------------------------------------------------
-def _validate_dest_path(raw_path: str) -> str:
-    """
-    Resolve path real e garante que está sob ALLOWED_DOWNLOAD_ROOT.
-    Bloqueia tentativas de path traversal (../../etc, etc.).
-    """
-    if not raw_path or not raw_path.strip():
+def _validate_dest_path(raw: str) -> str:
+    if not raw or not raw.strip():
         raise ValueError("Caminho de destino vazio.")
-
-    abs_path = os.path.realpath(raw_path)
+    abs_path = os.path.realpath(raw)
     abs_root = os.path.realpath(ALLOWED_DOWNLOAD_ROOT)
-
     if abs_path != abs_root and not abs_path.startswith(abs_root + os.sep):
         raise ValueError(
             f"Caminho fora da raiz permitida ({ALLOWED_DOWNLOAD_ROOT})."
         )
-
     os.makedirs(abs_path, exist_ok=True)
     return abs_path
 
 
 def _validate_links(raw_text: str) -> list:
-    """
-    Quebra o texto em linhas, valida URL básica e limita a MAX_LINKS.
-    Aceita comentários começando com '#'.
-    """
     links = []
     for line in raw_text.splitlines():
         line = line.strip()
@@ -152,91 +159,188 @@ def _validate_links(raw_text: str) -> list:
     return links
 
 
+def _validate_workers(raw: str) -> int:
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError("Número de workers inválido.")
+    if n < 1 or n > MAX_WORKERS:
+        raise ValueError(f"Workers deve estar entre 1 e {MAX_WORKERS}.")
+    return n
+
+
 # ---------------------------------------------------------------------------
-# Callback: traduz eventos do download_videos em updates do job dict
+# Callback (memória + DB)
 # ---------------------------------------------------------------------------
 def _make_callback(job_id: str):
+    """
+    Eventos de progresso são frequentes e ficam SÓ em memória.
+    Eventos persistidos:
+      - link_done   → tabela results
+      - info/success/warning/error → tabela messages
+    """
     def on_event(event: dict):
+        etype = event.get("type")
+        # Estado em memória sob lock
         with jobs_lock:
             job = jobs.get(job_id)
             if job is None:
                 return
-            etype = event.get("type")
 
             if etype == "progress":
-                job["current_percent"] = event.get("percent", 0)
-                if event.get("title"):
-                    job["current_title"] = event["title"]
                 link = event.get("link")
-                if link:
-                    job["links_status"][link] = {
+                if link is not None:
+                    prev = job["active"].get(link, {})
+                    job["active"][link] = {
+                        "title": event.get("title", "") or prev.get("title", ""),
                         "percent": event.get("percent", 0),
-                        "status": "downloading",
-                        "title": event.get("title", ""),
                     }
+                return  # progress NÃO vai pro DB
 
-            elif etype == "link_start":
-                job["current_link"] = event.get("index", 0)
-                job["total_links"] = event.get("total", job["total_links"])
-                job["current_link_url"] = event.get("link", "")
-                job["current_percent"] = 0
-                job["current_title"] = ""
-
-            elif etype == "link_done":
+            if etype == "link_start":
                 link = event.get("link")
-                if link:
-                    job["links_status"][link] = {
-                        "percent": 100 if event.get("success") else 0,
-                        "status": "success" if event.get("success") else "error",
-                        "title": event.get("title", ""),
-                        "message": event.get("message", ""),
-                    }
-                job["results"].append({
-                    "link": link,
-                    "title": event.get("title", ""),
-                    "success": event.get("success", False),
-                    "message": event.get("message", ""),
-                })
+                if link is not None:
+                    job["active"][link] = {"title": "", "percent": 0}
+                return  # link_start é transitório
 
-            elif etype in ("info", "success", "warning", "error"):
-                job["messages"].append({
-                    "type": etype,
-                    "message": event.get("message", ""),
-                    "ts": time.time(),
+            if etype == "link_done":
+                link = event.get("link")
+                title = event.get("title", "")
+                success = bool(event.get("success", False))
+                msg = event.get("message", "")
+                job["active"].pop(link, None)
+                job["results"].append({
+                    "link": link, "title": title,
+                    "success": success, "message": msg,
                 })
-                # Limita o histórico de mensagens para não estourar memória
+                job["done_count"] = len(job["results"])
+            elif etype in ("info", "success", "warning", "error"):
+                m = {"type": etype, "message": event.get("message", ""),
+                     "ts": time.time()}
+                job["messages"].append(m)
                 if len(job["messages"]) > 500:
                     job["messages"] = job["messages"][-500:]
+            else:
+                return
+
+        # I/O fora do lock
+        if etype == "link_done":
+            store.add_result(
+                job_id,
+                event.get("link", ""),
+                event.get("title", ""),
+                bool(event.get("success", False)),
+                event.get("message", ""),
+            )
+        elif etype in ("info", "success", "warning", "error"):
+            store.add_message(job_id, etype, event.get("message", ""))
+
     return on_event
 
 
-def _is_cancelled(job_id: str) -> bool:
-    with jobs_lock:
-        job = jobs.get(job_id)
-        return job is None or job["cancelled"]
+# ---------------------------------------------------------------------------
+# Execução paralela
+# ---------------------------------------------------------------------------
+def _run_single_link(job_id: str, link: str, dest_path: str,
+                     is_playlist: bool, fmt: str, on_event):
+    """Tarefa individual submetida ao executor."""
+    if _is_cancelled(job_id):
+        on_event({"type": "link_done", "link": link, "success": False,
+                  "title": "", "message": "Cancelado antes de iniciar"})
+        return
+
+    on_event({"type": "link_start", "link": link})
+    result = download_videos.baixar_video(
+        link=link,
+        download_dir=dest_path,
+        is_playlist=is_playlist,
+        fmt=fmt,
+        on_event=on_event,
+        is_cancelled=lambda: _is_cancelled(job_id),
+    )
+    on_event({
+        "type": "link_done",
+        "link": link,
+        "success": result["success"],
+        "title": result["title"],
+        "message": result["message"],
+    })
+    if result["success"]:
+        on_event({"type": "success",
+                  "message": f"OK: {result['title'] or link}"})
+    else:
+        on_event({"type": "error",
+                  "message": f"Falha em {link}: {result['message']}"})
 
 
 def _run_job(job_id: str, links: list, dest_path: str,
-             is_playlist: bool, fmt: str):
-    """Executa o download em thread; chamado via threading.Thread."""
+             is_playlist: bool, fmt: str, workers: int):
     cb = _make_callback(job_id)
+    cb({"type": "info",
+        "message": f"Iniciando {len(links)} link(s) com {workers} worker(s)."})
+
+    executor = ThreadPoolExecutor(
+        max_workers=workers,
+        thread_name_prefix=f"job-{job_id[:8]}",
+    )
+    with jobs_lock:
+        j = jobs.get(job_id)
+        if j is not None:
+            j["_executor"] = executor
+
+    futures: list = []
     try:
-        download_videos.processar_links(
-            links=links,
-            download_dir=dest_path,
-            is_playlist=is_playlist,
-            fmt=fmt,
-            on_event=cb,
-            is_cancelled=lambda: _is_cancelled(job_id),
-        )
-    except Exception as e:
-        cb({"type": "error", "message": f"Erro inesperado: {e}"})
-    finally:
+        for link in links:
+            fut: Future = executor.submit(
+                _run_single_link, job_id, link, dest_path,
+                is_playlist, fmt, cb,
+            )
+            futures.append(fut)
         with jobs_lock:
             j = jobs.get(job_id)
             if j is not None:
-                j["running"] = False
-                j["completed"] = True
+                j["_futures"] = futures
+
+        for fut in futures:
+            try:
+                fut.result()
+            except Exception as e:
+                cb({"type": "error", "message": f"Erro inesperado: {e}"})
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+
+    cancelled = _is_cancelled(job_id)
+    if cancelled:
+        cb({"type": "warning", "message": "Operação cancelada pelo usuário."})
+    else:
+        with jobs_lock:
+            j = jobs.get(job_id) or {}
+            ok = sum(1 for r in j.get("results", []) if r["success"])
+        total = len(links)
+        cb({"type": "info",
+            "message": f"Concluído. Sucesso: {ok}, falhas: {total - ok}."})
+
+    with jobs_lock:
+        j = jobs.get(job_id)
+        if j is not None:
+            j["running"] = False
+            j["completed"] = True
+            j["finished_at"] = time.time()
+            j["active"].clear()
+            j["_executor"] = None
+            j["_futures"] = []
+    store.finalize_job(job_id, completed=True, cancelled=cancelled)
+
+
+# ---------------------------------------------------------------------------
+# Serialização (esconde campos internos do JSON da API)
+# ---------------------------------------------------------------------------
+def _job_to_json(job: dict) -> dict:
+    out = {k: v for k, v in job.items() if not k.startswith("_")}
+    # active vira lista (mais fácil iterar no front)
+    out["active"] = [{"link": link, **info}
+                     for link, info in job.get("active", {}).items()]
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +349,6 @@ def _run_job(job_id: str, links: list, dest_path: str,
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        # 1) Caminho de destino (validado)
         try:
             dest_path = _validate_dest_path(
                 request.form.get("dest_path", DEFAULT_DOWNLOAD_PATH)
@@ -254,7 +357,6 @@ def index():
             flash(f"Erro no caminho de destino: {e}", "danger")
             return redirect(url_for("index"))
 
-        # 2) Tipo (vídeo/playlist) e formato/qualidade
         download_type = request.form.get("download_type", "video")
         is_playlist = download_type == "playlist"
 
@@ -263,7 +365,15 @@ def index():
             flash("Formato inválido.", "danger")
             return redirect(url_for("index"))
 
-        # 3) Coleta links: arquivo OU textarea
+        try:
+            workers = _validate_workers(
+                request.form.get("workers", str(DEFAULT_WORKERS))
+            )
+        except ValueError as e:
+            flash(str(e), "danger")
+            return redirect(url_for("index"))
+
+        # Coleta links (arquivo OU textarea)
         raw_links = request.form.get("links", "")
         upload = request.files.get("file")
         if upload and upload.filename:
@@ -286,19 +396,16 @@ def index():
             flash(str(e), "danger")
             return redirect(url_for("index"))
 
-        # 4) Cria e registra o job
-        job = _new_job()
-        job["running"] = True
-        job["total_links"] = len(links)
-        job["format"] = fmt
-        job["is_playlist"] = is_playlist
-        job["dest_path"] = dest_path
+        # Cria + persiste + dispara
+        job = _new_job(workers=workers, total_links=len(links), fmt=fmt,
+                       is_playlist=is_playlist, dest_path=dest_path)
         _register_job(job)
+        store.create_job(job)
+        store.prune_old(keep=MAX_JOBS_KEPT)
 
-        # 5) Dispara em background
         thread = threading.Thread(
             target=_run_job,
-            args=(job["id"], links, dest_path, is_playlist, fmt),
+            args=(job["id"], links, dest_path, is_playlist, fmt, workers),
             daemon=True,
         )
         thread.start()
@@ -308,26 +415,28 @@ def index():
     return render_template(
         "index.html",
         default_path=DEFAULT_DOWNLOAD_PATH,
-        recent_jobs=_recent_jobs(),
+        recent_jobs=store.list_recent(10),
+        max_workers=MAX_WORKERS,
+        default_workers=DEFAULT_WORKERS,
     )
 
 
 @app.route("/status/<job_id>")
 def status(job_id):
-    job = _get_job(job_id)
+    job = _get_job_or_404(job_id)
     return render_template("status.html", status=job)
 
 
 @app.route("/results/<job_id>")
 def results(job_id):
-    job = _get_job(job_id)
+    job = _get_job_or_404(job_id)
     return render_template("results.html", status=job)
 
 
 @app.route("/api/status/<job_id>")
 def api_status(job_id):
-    job = _get_job(job_id)
-    return jsonify(job)
+    job = _get_job_or_404(job_id)
+    return jsonify(_job_to_json(job))
 
 
 @app.route("/api/cancel/<job_id>", methods=["POST"])
@@ -335,10 +444,13 @@ def api_cancel(job_id):
     with jobs_lock:
         job = jobs.get(job_id)
         if job is None:
-            return jsonify({"ok": False, "error": "not_found"}), 404
+            return jsonify({"ok": False, "error": "not_found_or_finished"}), 404
         if not job["running"]:
             return jsonify({"ok": False, "error": "not_running"}), 400
         job["cancelled"] = True
+        # Cancela futures ainda na fila (in-flight são abortados pelo hook)
+        for f in job.get("_futures", []):
+            f.cancel()
     return jsonify({"ok": True})
 
 
