@@ -19,7 +19,7 @@ echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
 # IMPORTANTE: edite .env e ajuste HOST_DOWNLOAD_PATH, APP_UID, APP_GID
 # (veja a próxima seção — é onde mais se erra)
 
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 Acesse [http://localhost:5000](http://localhost:5000).
@@ -27,8 +27,8 @@ Acesse [http://localhost:5000](http://localhost:5000).
 Para parar:
 
 ```bash
-docker-compose down              # mantém o histórico de jobs
-docker-compose down -v           # apaga TAMBÉM o histórico
+docker compose down              # mantém o histórico de jobs
+docker compose down -v           # apaga TAMBÉM o histórico
 ```
 
 ---
@@ -103,8 +103,8 @@ stat -c "%u %g %n" /mnt/nas/Downloads
 Basta editar `HOST_DOWNLOAD_PATH` no `.env` e:
 
 ```bash
-docker-compose down              # mantém o histórico
-docker-compose up -d             # sobe com a nova pasta
+docker compose down              # mantém o histórico
+docker compose up -d             # sobe com a nova pasta
 ```
 
 Jobs antigos continuam visíveis no histórico, mas referenciam o caminho anterior.
@@ -161,13 +161,13 @@ Eventos saem como JSON (uma linha por evento) no stdout.
 Os extractors do YouTube quebram com frequência. Quando começar a falhar:
 
 ```bash
-docker-compose build --no-cache && docker-compose up -d
+docker compose build --no-cache && docker compose up -d
 ```
 
 ### Inspecionar o histórico (SQLite)
 
 ```bash
-docker-compose exec video-downloader sqlite3 /data/jobs.db
+docker compose exec video-downloader sqlite3 /data/jobs.db
 sqlite> .tables
 sqlite> SELECT id, total_links, completed, cancelled
         FROM jobs ORDER BY created_at DESC LIMIT 10;
@@ -186,7 +186,7 @@ Confira se a pasta no host pertence ao mesmo UID/GID do `.env`:
 `stat -c "%u %g %n" $HOST_DOWNLOAD_PATH`
 
 **`yt-dlp: extractor X is broken`**
-Rode `docker-compose build --no-cache && docker-compose up -d`.
+Rode `docker compose build --no-cache && docker compose up -d`.
 
 **Porta 5000 já em uso**
 Mude `HOST_PORT` no `.env` para outra porta livre (ex: `8080`).
