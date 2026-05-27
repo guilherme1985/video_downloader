@@ -117,6 +117,7 @@ Jobs antigos continuam visíveis no histórico, mas referenciam o caminho anteri
 - Formatos: melhor disponível, 1080p / 720p / 480p, áudio MP3, áudio M4A
 - Downloads paralelos (1 a N workers por job, configurável no formulário)
 - Cancelar a qualquer momento (em curso são abortados, pendentes descartados)
+- **Tentar novamente** — reprocessa apenas os links com falha, herdando todas as configurações do job original
 - Histórico persistente em SQLite — sobrevive a restart do container
 - Cleanup automático de jobs zumbis interrompidos por restart
 - CLI standalone (`download_videos.py`) para uso em scripts/cron
@@ -205,6 +206,21 @@ Adicione `SECRET_KEY=$(openssl rand -hex 32)` ao `.env`.
 - Container roda como usuário não-root
 - `SECRET_KEY` obrigatório (sem fallback de produção)
 - Modo debug desligado por padrão
+
+## 📋 Changelog
+
+### v2.2
+- Botão **"Tentar novamente (N)"** na página de resultados: reprocessa apenas os links que falharam, herdando formato, pasta de destino, workers e modo playlist do job original.
+- Novo endpoint `POST /api/retry/<job_id>` que cria um novo job com os links com falha.
+
+### v2.1.2
+- Limpeza de registros antigos (LRU) no histórico.
+
+### v2.1.1
+- Novo layout e fonte (Geist + Geist Mono).
+
+### v2.1.0
+- Downloads paralelos e seleção de qualidade/formato.
 
 ## 📂 Estrutura do projeto
 
