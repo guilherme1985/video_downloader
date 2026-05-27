@@ -104,9 +104,41 @@
         <a href="{{ url_for('status', job_id=status.id) }}" class="btn btn-ghost">
             <i class="bi bi-arrow-left"></i><span>Status</span>
         </a>
-        <a href="{{ url_for('index') }}" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i><span>Nova tarefa</span>
-        </a>
+        <div class="d-flex gap-2">
+            {% if fail_count > 0 and not status.running %}
+            <button id="btn-retry" class="btn btn-outline-danger" onclick="retryFailed()" type="button">
+                <i class="bi bi-arrow-clockwise"></i><span>Tentar novamente ({{ fail_count }})</span>
+            </button>
+            {% endif %}
+            <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i><span>Nova tarefa</span>
+            </a>
+        </div>
     </div>
 </div>
+
+{% if fail_count > 0 and not status.running %}
+<script>
+    async function retryFailed() {
+        const btn = document.getElementById('btn-retry');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i><span>Criando...</span>';
+        try {
+            const r = await fetch('/api/retry/{{ status.id }}', { method: 'POST' });
+            const data = await r.json();
+            if (data.ok) {
+                window.location.href = '/status/' + data.job_id;
+            } else {
+                alert(data.message || 'Erro ao criar nova tentativa.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i><span>Tentar novamente ({{ fail_count }})</span>';
+            }
+        } catch (_) {
+            alert('Erro de conexão. Tente novamente.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i><span>Tentar novamente ({{ fail_count }})</span>';
+        }
+    }
+</script>
+{% endif %}
 {% endblock %}

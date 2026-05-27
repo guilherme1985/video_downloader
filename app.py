@@ -482,6 +482,43 @@ def api_delete_job(job_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/retry/<job_id>", methods=["POST"])
+def api_retry(job_id):
+    """Cria um novo job com os links que falharam no job original."""
+    original = _get_job_or_404(job_id)
+
+    if original.get("running"):
+        return jsonify({"ok": False, "error": "still_running",
+                        "message": "Cancele a tarefa antes de tentar novamente."}), 400
+
+    failed_links = [r["link"] for r in original.get("results", [])
+                    if not r["success"]]
+    if not failed_links:
+        return jsonify({"ok": False, "error": "no_failures",
+                        "message": "Nenhuma falha encontrada para retentar."}), 400
+
+    job = _new_job(
+        workers=original["workers"],
+        total_links=len(failed_links),
+        fmt=original["format"],
+        is_playlist=original["is_playlist"],
+        dest_path=original["dest_path"],
+    )
+    _register_job(job)
+    store.create_job(job)
+    store.prune_old(keep=MAX_JOBS_KEPT)
+
+    thread = threading.Thread(
+        target=_run_job,
+        args=(job["id"], failed_links, original["dest_path"],
+              original["is_playlist"], original["format"], original["workers"]),
+        daemon=True,
+    )
+    thread.start()
+
+    return jsonify({"ok": True, "job_id": job["id"]})
+
+
 @app.route("/api/jobs", methods=["DELETE"])
 def api_delete_finished():
     """Apaga todas as tarefas que não estão em execução."""
