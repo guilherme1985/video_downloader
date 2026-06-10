@@ -118,6 +118,9 @@ Jobs antigos continuam visíveis no histórico, mas referenciam o caminho anteri
 - Downloads paralelos (1 a N workers por job, configurável no formulário)
 - Cancelar a qualquer momento (em curso são abortados, pendentes descartados)
 - **Tentar novamente** — reprocessa apenas os links com falha, herdando todas as configurações do job original
+- **Download ao navegador** — botão por resultado na página de resultados para baixar o arquivo diretamente
+- **Autenticação com cookie** — envie um arquivo `.txt` no formato Netscape (compatível com extensão "Get cookies.txt LOCALLY") para sites que exigem login
+- **Cookies persistentes** — salve cookies para reutilização em jobs futuros; gerencie a lista diretamente na interface (selecionar e excluir individualmente)
 - Histórico persistente em SQLite — sobrevive a restart do container
 - Cleanup automático de jobs zumbis interrompidos por restart
 - CLI standalone (`download_videos.py`) para uso em scripts/cron
@@ -208,6 +211,17 @@ Adicione `SECRET_KEY=$(openssl rand -hex 32)` ao `.env`.
 - Modo debug desligado por padrão
 
 ## 📋 Changelog
+
+### v2.4
+- **Download ao navegador**: botão de download por resultado na página de resultados, com validação de path traversal.
+- **Autenticação com cookie**: campo de upload de arquivo `.txt` no formato Netscape. O cookie pode ser de uso único (descartado após o job) ou salvo para reutilização.
+- **Cookies persistentes**: lista de cookies salvos na interface, com opção de selecionar para um novo job e excluir individualmente.
+- **Header fixo** com nome da aplicação e versão atual.
+- **Correção de formato**: strings de formato do yt-dlp atualizadas para preferir H.264+AAC (streams `[ext=mp4]+[ext=m4a]`), evitando erros de merge com AV1+Opus em ffmpeg padrão.
+
+### v2.3
+- Ajustes de layout preservando cores e tema dark.
+- Suporte a sites além do YouTube via yt-dlp.
 
 ### v2.2
 - Botão **"Tentar novamente (N)"** na página de resultados: reprocessa apenas os links que falharam, herdando formato, pasta de destino, workers e modo playlist do job original.
