@@ -52,6 +52,13 @@ CREATE TABLE IF NOT EXISTS results (
     FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_results_job ON results(job_id, id);
+
+CREATE TABLE IF NOT EXISTS cookies (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    filename   TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL
+);
 """
 
 
@@ -224,6 +231,39 @@ class JobStore:
                    VALUES (?,?,?,?,?,?)""",
                 (job_id, link, title, int(success), message, file_path),
             )
+
+    # ---- Cookies ------------------------------------------------------
+
+    def create_cookie(self, cookie_id: str, name: str, filename: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO cookies(id, name, filename, created_at)
+                   VALUES (?,?,?,?)""",
+                (cookie_id, name, filename, time.time()),
+            )
+
+    def list_cookies(self) -> list:
+        with self._lock:
+            rows = self._conn.execute(
+                """SELECT id, name, filename, created_at
+                   FROM cookies ORDER BY created_at DESC"""
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_cookie(self, cookie_id: str) -> Optional[dict]:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT id, name, filename, created_at FROM cookies WHERE id=?",
+                (cookie_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def delete_cookie(self, cookie_id: str) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM cookies WHERE id=?", (cookie_id,)
+            )
+            return cur.rowcount > 0
 
     # ---- Util ---------------------------------------------------------
 

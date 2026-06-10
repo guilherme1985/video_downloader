@@ -864,5 +864,67 @@ input[type="file"]::file-selector-button:hover {
 .ms-2 { margin-left: var(--sp-2); }
 .float-end { float: right; }
 
+/* ============================================================
+   Saved cookies list (index — panel 05)
+   ============================================================ */
+.saved-cookies-wrap {
+    margin-top: var(--sp-5);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--r-md);
+    overflow: hidden;
+}
+.saved-cookies-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--bg-softer);
+    border-bottom: 1px solid var(--border-soft);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.saved-cookie-item {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--bg-card);
+    transition: background 0.12s;
+}
+.saved-cookie-item:last-child { border-bottom: none; }
+.saved-cookie-item:hover { background: var(--bg-soft); }
+.saved-cookie-item.is-selected {
+    background: rgba(13, 110, 253, 0.06);
+    border-left: 2px solid var(--primary);
+}
+.saved-cookie-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    cursor: pointer;
+    min-width: 0;
+}
+.saved-cookie-name {
+    font-size: var(--fs-sm);
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+.saved-cookie-file {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Hide bootstrap progress-bar text content (stripes/animated still work via class) */
 .progress-bar-striped, .progress-bar-animated { background-image: none; animation: none; }

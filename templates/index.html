@@ -94,15 +94,57 @@
             <div class="panel-head">
                 <span class="panel-title">05 · Cookie <span class="text-faint" style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></span>
             </div>
-            <div class="field" style="margin-bottom:0">
-                <label class="field-label">Arquivo de cookies <span class="text-faint" style="font-weight:400">.txt — formato Netscape</span></label>
-                <input type="file" class="form-control" name="cookies_file" accept=".txt">
+
+            <input type="hidden" name="use_saved_cookie_id" id="use-saved-cookie-id" value="">
+
+            <div class="field">
+                <label class="field-label">
+                    Novo arquivo <span class="text-faint" style="font-weight:400">.txt — formato Netscape</span>
+                </label>
+                <input type="file" class="form-control" id="cookies-file-input"
+                       name="cookies_file" accept=".txt" onchange="onCookieFileChange()">
                 <small class="form-text">
-                    Necessário para sites com restrição de idade ou login.
-                    Exporte com a extensão <span class="mono">Get cookies.txt LOCALLY</span>.
-                    O arquivo é descartado ao término do job.
+                    Para sites com restrição de login. Exporte com
+                    <span class="mono">Get cookies.txt LOCALLY</span>.
                 </small>
             </div>
+
+            <div class="field" style="margin-bottom:0">
+                <label class="field-label">
+                    Salvar com o nome
+                    <span class="text-faint" style="font-weight:400">(deixe vazio para uso único e descarte automático)</span>
+                </label>
+                <input type="text" class="input" name="cookie_save_name"
+                       id="cookie-save-name"
+                       placeholder="Ex.: YouTube pessoal">
+            </div>
+
+            {% if saved_cookies %}
+            <div class="saved-cookies-wrap" id="saved-cookies-wrap">
+                <div class="saved-cookies-header">
+                    <i class="bi bi-bookmark-fill"></i>
+                    <span>Cookies salvos</span>
+                </div>
+                {% for c in saved_cookies %}
+                <div class="saved-cookie-item" id="cookie-item-{{ c.id }}" data-id="{{ c.id }}">
+                    <label class="saved-cookie-label">
+                        <input type="radio" name="_cookie_radio" value="{{ c.id }}"
+                               class="form-check-input"
+                               onchange="onSavedCookieSelect('{{ c.id }}', this)">
+                        <span class="saved-cookie-name">{{ c.name }}</span>
+                        <span class="saved-cookie-file">{{ c.filename or '' }}</span>
+                    </label>
+                    <button type="button" class="btn-icon-danger"
+                            onclick="deleteSavedCookie('{{ c.id }}')"
+                            title="Excluir cookie">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div id="saved-cookies-wrap" class="saved-cookies-wrap" style="display:none"></div>
+            {% endif %}
         </div>
 
         <div class="d-flex justify-content-end mt-4">
@@ -168,6 +210,63 @@
 
 {% block scripts %}
 <script>
+// ---- Cookie helpers ------------------------------------------------
+
+function onSavedCookieSelect(id, radio) {
+    document.getElementById('use-saved-cookie-id').value = id;
+    // Limpa o file input para evitar ambiguidade
+    const fi = document.getElementById('cookies-file-input');
+    fi.value = '';
+    document.getElementById('cookie-save-name').value = '';
+    // Destaca o item selecionado
+    document.querySelectorAll('.saved-cookie-item').forEach(el => {
+        el.classList.toggle('is-selected', el.dataset.id === id);
+    });
+}
+
+function onCookieFileChange() {
+    // Deseleciona qualquer cookie salvo quando um novo arquivo é escolhido
+    document.getElementById('use-saved-cookie-id').value = '';
+    document.querySelectorAll('input[name="_cookie_radio"]').forEach(r => {
+        r.checked = false;
+    });
+    document.querySelectorAll('.saved-cookie-item').forEach(el => {
+        el.classList.remove('is-selected');
+    });
+}
+
+async function deleteSavedCookie(cookieId) {
+    if (!confirm('Excluir este cookie?\nEle não poderá mais ser utilizado em novos jobs.')) return;
+    try {
+        const r = await fetch(`/api/cookies/${cookieId}`, { method: 'DELETE' });
+        const data = await r.json();
+        if (!r.ok) {
+            alert(data.message || 'Não foi possível excluir o cookie.');
+            return;
+        }
+        const el = document.getElementById(`cookie-item-${cookieId}`);
+        if (el) {
+            el.style.transition = 'opacity 0.2s';
+            el.style.opacity = '0';
+            setTimeout(() => {
+                el.remove();
+                const wrap = document.getElementById('saved-cookies-wrap');
+                if (wrap && wrap.querySelectorAll('.saved-cookie-item').length === 0) {
+                    wrap.style.display = 'none';
+                }
+                // Se era o selecionado, limpar o hidden input
+                if (document.getElementById('use-saved-cookie-id').value === cookieId) {
+                    document.getElementById('use-saved-cookie-id').value = '';
+                }
+            }, 200);
+        }
+    } catch (e) {
+        alert('Erro de rede. Tente novamente.');
+    }
+}
+
+// ---- Job helpers ---------------------------------------------------
+
 async function deleteJob(jobId) {
     if (!confirm('Remover esta tarefa do histórico?\n\n(Os arquivos baixados não serão apagados.)')) return;
     try {

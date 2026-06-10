@@ -35,6 +35,7 @@ APP_VERSION = "v2.3"
 DEFAULT_DOWNLOAD_PATH = os.environ.get("DEFAULT_DOWNLOAD_PATH", "/mnt/nas/Downloads")
 ALLOWED_DOWNLOAD_ROOT = os.environ.get("ALLOWED_DOWNLOAD_ROOT", DEFAULT_DOWNLOAD_PATH)
 DB_PATH = os.environ.get("DB_PATH", "/data/jobs.db")
+COOKIE_DIR = os.environ.get("COOKIE_DIR", "/data/cookies")
 SECRET_KEY = os.environ.get("SECRET_KEY") or os.urandom(32).hex()
 
 MAX_LINKS = int(os.environ.get("MAX_LINKS", "500"))
@@ -176,6 +177,10 @@ def _validate_workers(raw: str) -> int:
     return n
 
 
+def _cookie_path(cookie_id: str) -> str:
+    return os.path.join(COOKIE_DIR, f"{cookie_id}.txt")
+
+
 # ---------------------------------------------------------------------------
 # Callback (memória + DB)
 # ---------------------------------------------------------------------------
@@ -289,7 +294,7 @@ def _run_single_link(job_id: str, link: str, dest_path: str,
 
 def _run_job(job_id: str, links: list, dest_path: str,
              is_playlist: bool, fmt: str, workers: int,
-             cookiefile=None):
+             cookiefile=None, delete_cookiefile=False):
     cb = _make_callback(job_id)
     cb({"type": "info",
         "message": f"Iniciando {len(links)} link(s) com {workers} worker(s)."})
@@ -323,7 +328,7 @@ def _run_job(job_id: str, links: list, dest_path: str,
                 cb({"type": "error", "message": f"Erro inesperado: {e}"})
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
-        if cookiefile:
+        if cookiefile and delete_cookiefile:
             try:
                 os.remove(cookiefile)
             except OSError:
@@ -416,19 +421,43 @@ def index():
             flash(str(e), "danger")
             return redirect(url_for("index"))
 
-        # Cookie file opcional (para sites com restrição de login)
+        # Cookie file opcional
         cookiefile_path = None
+        delete_cookiefile = False
+
+        use_saved_id = request.form.get("use_saved_cookie_id", "").strip()
         cookies_upload = request.files.get("cookies_file")
+        cookie_save_name = request.form.get("cookie_save_name", "").strip()
+
         if cookies_upload and cookies_upload.filename:
+            # Upload tem prioridade sobre seleção de cookie salvo
             if not cookies_upload.filename.lower().endswith(".txt"):
                 flash("Arquivo de cookies deve ser .txt (formato Netscape).", "danger")
                 return redirect(url_for("index"))
-            tmp_cookies = os.path.join(
-                tempfile.gettempdir(),
-                f"{uuid.uuid4().hex}_cookies.txt",
-            )
-            cookies_upload.save(tmp_cookies)
-            cookiefile_path = tmp_cookies
+            if cookie_save_name:
+                # Salvar permanentemente em /data/cookies/
+                os.makedirs(COOKIE_DIR, exist_ok=True)
+                cookie_id = str(uuid.uuid4())
+                saved_path = _cookie_path(cookie_id)
+                cookies_upload.save(saved_path)
+                store.create_cookie(cookie_id, cookie_save_name,
+                                    cookies_upload.filename)
+                cookiefile_path = saved_path
+            else:
+                # Uso único — deletar após o job
+                tmp_cookies = os.path.join(
+                    tempfile.gettempdir(),
+                    f"{uuid.uuid4().hex}_cookies.txt",
+                )
+                cookies_upload.save(tmp_cookies)
+                cookiefile_path = tmp_cookies
+                delete_cookiefile = True
+        elif use_saved_id:
+            cookie_record = store.get_cookie(use_saved_id)
+            if cookie_record:
+                path = _cookie_path(use_saved_id)
+                if os.path.isfile(path):
+                    cookiefile_path = path
 
         # Cria + persiste + dispara
         job = _new_job(workers=workers, total_links=len(links), fmt=fmt,
@@ -440,7 +469,7 @@ def index():
         thread = threading.Thread(
             target=_run_job,
             args=(job["id"], links, dest_path, is_playlist, fmt,
-                  workers, cookiefile_path),
+                  workers, cookiefile_path, delete_cookiefile),
             daemon=True,
         )
         thread.start()
@@ -453,6 +482,7 @@ def index():
         recent_jobs=store.list_recent(10),
         max_workers=MAX_WORKERS,
         default_workers=DEFAULT_WORKERS,
+        saved_cookies=store.list_cookies(),
     )
 
 
@@ -564,6 +594,24 @@ def api_delete_finished():
             jobs.pop(jid, None)
     n = store.delete_finished()
     return jsonify({"ok": True, "deleted": n})
+
+
+@app.route("/api/cookies")
+def api_list_cookies():
+    return jsonify(store.list_cookies())
+
+
+@app.route("/api/cookies/<cookie_id>", methods=["DELETE"])
+def api_delete_cookie(cookie_id):
+    cookie = store.get_cookie(cookie_id)
+    if not cookie:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    try:
+        os.remove(_cookie_path(cookie_id))
+    except OSError:
+        pass
+    store.delete_cookie(cookie_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/download/<job_id>/<int:result_idx>")
