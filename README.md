@@ -212,12 +212,21 @@ Adicione `SECRET_KEY=$(openssl rand -hex 32)` ao `.env`.
 
 ## 📋 Changelog
 
+### v2.4.3
+- **Correção visual dos botões "Escolher arquivo"**: Bootstrap 5.3 sobrescrevia o estilo do `::file-selector-button` no hover via regra de alta especificidade (`--bs-secondary-bg`). Corrigido adicionando seletores equivalentes com `.form-control[type="file"]` que vencem no empate de cascata.
+
+### v2.4.2
+- **Correção de hover em todos os botões**: Bootstrap 5.3 aplicava `--bs-btn-hover-bg`/`--bs-btn-hover-color` (tema claro) via `.btn:hover`, sobrescrevendo os estilos custom mesmo com `theme.css` carregando depois. Corrigido zerando essas variáveis na regra base `.btn`.
+- **Correção de formato incompatível**: `FORMAT_MAP` do yt-dlp passou a priorizar `[ext=mp4]+bestaudio[ext=m4a]` (H.264+AAC) em todos os formatos de vídeo, evitando o erro `Requested format is not available` causado por streams AV1+Opus que não mergiam em MP4 no ffmpeg padrão.
+
+### v2.4.1
+- **Estados de foco por teclado**: adicionados estilos `:focus-visible` em todos os botões (primário, sucesso, danger, ghost, ícone, link-muted), garantindo anel de foco visível na navegação por teclado.
+
 ### v2.4
 - **Download ao navegador**: botão de download por resultado na página de resultados, com validação de path traversal.
 - **Autenticação com cookie**: campo de upload de arquivo `.txt` no formato Netscape. O cookie pode ser de uso único (descartado após o job) ou salvo para reutilização.
 - **Cookies persistentes**: lista de cookies salvos na interface, com opção de selecionar para um novo job e excluir individualmente.
 - **Header fixo** com nome da aplicação e versão atual.
-- **Correção de formato**: strings de formato do yt-dlp atualizadas para preferir H.264+AAC (streams `[ext=mp4]+[ext=m4a]`), evitando erros de merge com AV1+Opus em ffmpeg padrão.
 
 ### v2.3
 - Ajustes de layout preservando cores e tema dark.
