@@ -61,6 +61,8 @@ def _build_ydl_opts(
     is_cancelled: Optional[CancelChecker],
     current_link: Optional[str],
     is_playlist: bool,
+    cookiefile: Optional[str] = None,
+    file_tracker: Optional[list] = None,
 ) -> dict:
     """Monta opções do yt-dlp incluindo o progress_hook."""
 
@@ -69,6 +71,11 @@ def _build_ydl_opts(
         # no meio do download é levantando exceção do hook.
         if is_cancelled and is_cancelled():
             raise _Cancelled()
+        # Fallback: captura o arquivo baixado antes de qualquer pós-processamento
+        if d.get("status") == "finished" and file_tracker is not None and not file_tracker:
+            fn = d.get("filename") or ""
+            if fn:
+                file_tracker.append(os.path.abspath(fn))
         if d.get("status") != "downloading":
             return
         if not on_event:
@@ -117,6 +124,21 @@ def _build_ydl_opts(
         }]
         opts.pop("merge_output_format", None)
 
+    if cookiefile:
+        opts["cookiefile"] = cookiefile
+
+    if file_tracker is not None:
+        def _pp_hook(d):
+            if d.get("status") == "finished":
+                fp = (d.get("info_dict") or {}).get("filepath") or ""
+                if fp:
+                    abs_fp = os.path.abspath(fp)
+                    if file_tracker:
+                        file_tracker[0] = abs_fp
+                    else:
+                        file_tracker.append(abs_fp)
+        opts["postprocessor_hooks"] = [_pp_hook]
+
     return opts
 
 
@@ -127,12 +149,14 @@ def baixar_video(
     fmt: str = "best",
     on_event: Optional[EventCallback] = None,
     is_cancelled: Optional[CancelChecker] = None,
+    cookiefile: Optional[str] = None,
 ) -> dict:
     """
     Baixa um único link (vídeo ou playlist).
     Retorna dict {success, title, message}.
     """
     os.makedirs(download_dir, exist_ok=True)
+    file_tracker: list = []
     opts = _build_ydl_opts(
         output_dir=download_dir,
         fmt=fmt,
@@ -140,6 +164,8 @@ def baixar_video(
         is_cancelled=is_cancelled,
         current_link=link,
         is_playlist=is_playlist,
+        cookiefile=cookiefile,
+        file_tracker=file_tracker,
     )
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -161,24 +187,25 @@ def baixar_video(
                 with yt_dlp.YoutubeDL(opts) as ydl2:
                     ydl2.download([link])
                 _log(download_dir, f"Playlist concluída: {playlist_title} ({link})")
-                return {"success": True, "title": playlist_title, "message": ""}
+                return {"success": True, "title": playlist_title, "message": "", "file_path": playlist_dir}
 
             video_title = (info or {}).get("title") or "Vídeo"
             if on_event:
                 on_event({"type": "info", "message": f"Iniciando: {video_title}"})
             ydl.download([link])
             _log(download_dir, f"Concluído: {video_title} ({link})")
-            return {"success": True, "title": video_title, "message": ""}
+            file_path = file_tracker[0] if file_tracker else ""
+            return {"success": True, "title": video_title, "message": "", "file_path": file_path}
 
     except _Cancelled:
         _log(download_dir, f"Cancelado: {link}")
-        return {"success": False, "title": "", "message": "Cancelado"}
+        return {"success": False, "title": "", "message": "Cancelado", "file_path": ""}
     except yt_dlp.utils.DownloadError as e:
         _log(download_dir, f"Falha: {link} — {e}")
-        return {"success": False, "title": "", "message": str(e)}
+        return {"success": False, "title": "", "message": str(e), "file_path": ""}
     except Exception as e:  # rede, FS, etc
         _log(download_dir, f"Erro inesperado: {link} — {e}")
-        return {"success": False, "title": "", "message": str(e)}
+        return {"success": False, "title": "", "message": str(e), "file_path": ""}
 
 
 def processar_links(
@@ -188,6 +215,7 @@ def processar_links(
     fmt: str = "best",
     on_event: Optional[EventCallback] = None,
     is_cancelled: Optional[CancelChecker] = None,
+    cookiefile: Optional[str] = None,
 ) -> None:
     """Processa uma lista de links sequencialmente, emitindo eventos."""
     os.makedirs(download_dir, exist_ok=True)
@@ -215,6 +243,7 @@ def processar_links(
             fmt=fmt,
             on_event=on_event,
             is_cancelled=is_cancelled,
+            cookiefile=cookiefile,
         )
 
         if not result["success"]:
@@ -227,6 +256,7 @@ def processar_links(
                 "success": result["success"],
                 "title": result["title"],
                 "message": result["message"],
+                "file_path": result.get("file_path", ""),
             })
             if result["success"]:
                 on_event({"type": "success",

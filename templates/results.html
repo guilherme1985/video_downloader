@@ -62,7 +62,8 @@
                 <tr>
                     <th class="cell-status">Status</th>
                     <th>Título</th>
-                    <th style="width: 380px;">URL</th>
+                    <th style="width: 340px;">URL</th>
+                    <th class="cell-action"></th>
                 </tr>
             </thead>
             <tbody>
@@ -87,6 +88,14 @@
                             {% endif %}
                         </td>
                         <td class="url-cell" title="{{ r.link }}">{{ r.link }}</td>
+                        <td class="cell-action">
+                            {% if r.success and r.file_path %}
+                            <a href="{{ url_for('download_file', job_id=status.id, result_idx=loop.index0) }}"
+                               class="btn-download" title="Baixar arquivo">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
                     <tr>

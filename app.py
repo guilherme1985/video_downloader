@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    flash, jsonify, abort
+    flash, jsonify, abort, send_file
 )
 from werkzeug.utils import secure_filename
 
@@ -30,6 +30,8 @@ from db import JobStore
 # ---------------------------------------------------------------------------
 # Configuração
 # ---------------------------------------------------------------------------
+APP_VERSION = "v2.3"
+
 DEFAULT_DOWNLOAD_PATH = os.environ.get("DEFAULT_DOWNLOAD_PATH", "/mnt/nas/Downloads")
 ALLOWED_DOWNLOAD_ROOT = os.environ.get("ALLOWED_DOWNLOAD_ROOT", DEFAULT_DOWNLOAD_PATH)
 DB_PATH = os.environ.get("DB_PATH", "/data/jobs.db")
@@ -49,6 +51,11 @@ ALLOWED_FORMATS = {
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+
+
+@app.context_processor
+def _inject_globals():
+    return {"app_version": APP_VERSION}
 
 
 # ---------------------------------------------------------------------------
@@ -208,10 +215,12 @@ def _make_callback(job_id: str):
                 title = event.get("title", "")
                 success = bool(event.get("success", False))
                 msg = event.get("message", "")
+                file_path = event.get("file_path", "")
                 job["active"].pop(link, None)
                 job["results"].append({
                     "link": link, "title": title,
                     "success": success, "message": msg,
+                    "file_path": file_path,
                 })
                 job["done_count"] = len(job["results"])
             elif etype in ("info", "success", "warning", "error"):
@@ -231,6 +240,7 @@ def _make_callback(job_id: str):
                 event.get("title", ""),
                 bool(event.get("success", False)),
                 event.get("message", ""),
+                event.get("file_path", ""),
             )
         elif etype in ("info", "success", "warning", "error"):
             store.add_message(job_id, etype, event.get("message", ""))
@@ -242,11 +252,13 @@ def _make_callback(job_id: str):
 # Execução paralela
 # ---------------------------------------------------------------------------
 def _run_single_link(job_id: str, link: str, dest_path: str,
-                     is_playlist: bool, fmt: str, on_event):
+                     is_playlist: bool, fmt: str, on_event,
+                     cookiefile=None):
     """Tarefa individual submetida ao executor."""
     if _is_cancelled(job_id):
         on_event({"type": "link_done", "link": link, "success": False,
-                  "title": "", "message": "Cancelado antes de iniciar"})
+                  "title": "", "message": "Cancelado antes de iniciar",
+                  "file_path": ""})
         return
 
     on_event({"type": "link_start", "link": link})
@@ -257,6 +269,7 @@ def _run_single_link(job_id: str, link: str, dest_path: str,
         fmt=fmt,
         on_event=on_event,
         is_cancelled=lambda: _is_cancelled(job_id),
+        cookiefile=cookiefile,
     )
     on_event({
         "type": "link_done",
@@ -264,6 +277,7 @@ def _run_single_link(job_id: str, link: str, dest_path: str,
         "success": result["success"],
         "title": result["title"],
         "message": result["message"],
+        "file_path": result.get("file_path", ""),
     })
     if result["success"]:
         on_event({"type": "success",
@@ -274,7 +288,8 @@ def _run_single_link(job_id: str, link: str, dest_path: str,
 
 
 def _run_job(job_id: str, links: list, dest_path: str,
-             is_playlist: bool, fmt: str, workers: int):
+             is_playlist: bool, fmt: str, workers: int,
+             cookiefile=None):
     cb = _make_callback(job_id)
     cb({"type": "info",
         "message": f"Iniciando {len(links)} link(s) com {workers} worker(s)."})
@@ -293,7 +308,7 @@ def _run_job(job_id: str, links: list, dest_path: str,
         for link in links:
             fut: Future = executor.submit(
                 _run_single_link, job_id, link, dest_path,
-                is_playlist, fmt, cb,
+                is_playlist, fmt, cb, cookiefile,
             )
             futures.append(fut)
         with jobs_lock:
@@ -308,6 +323,11 @@ def _run_job(job_id: str, links: list, dest_path: str,
                 cb({"type": "error", "message": f"Erro inesperado: {e}"})
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
+        if cookiefile:
+            try:
+                os.remove(cookiefile)
+            except OSError:
+                pass
 
     cancelled = _is_cancelled(job_id)
     if cancelled:
@@ -396,6 +416,20 @@ def index():
             flash(str(e), "danger")
             return redirect(url_for("index"))
 
+        # Cookie file opcional (para sites com restrição de login)
+        cookiefile_path = None
+        cookies_upload = request.files.get("cookies_file")
+        if cookies_upload and cookies_upload.filename:
+            if not cookies_upload.filename.lower().endswith(".txt"):
+                flash("Arquivo de cookies deve ser .txt (formato Netscape).", "danger")
+                return redirect(url_for("index"))
+            tmp_cookies = os.path.join(
+                tempfile.gettempdir(),
+                f"{uuid.uuid4().hex}_cookies.txt",
+            )
+            cookies_upload.save(tmp_cookies)
+            cookiefile_path = tmp_cookies
+
         # Cria + persiste + dispara
         job = _new_job(workers=workers, total_links=len(links), fmt=fmt,
                        is_playlist=is_playlist, dest_path=dest_path)
@@ -405,7 +439,8 @@ def index():
 
         thread = threading.Thread(
             target=_run_job,
-            args=(job["id"], links, dest_path, is_playlist, fmt, workers),
+            args=(job["id"], links, dest_path, is_playlist, fmt,
+                  workers, cookiefile_path),
             daemon=True,
         )
         thread.start()
@@ -529,6 +564,31 @@ def api_delete_finished():
             jobs.pop(jid, None)
     n = store.delete_finished()
     return jsonify({"ok": True, "deleted": n})
+
+
+@app.route("/download/<job_id>/<int:result_idx>")
+def download_file(job_id, result_idx):
+    """Serve um arquivo baixado diretamente para o browser."""
+    job = _get_job_or_404(job_id)
+    results = job.get("results", [])
+    if result_idx < 0 or result_idx >= len(results):
+        abort(404)
+    result = results[result_idx]
+    if not result.get("success") or not result.get("file_path"):
+        abort(404)
+
+    file_path = os.path.realpath(result["file_path"])
+    allowed_root = os.path.realpath(ALLOWED_DOWNLOAD_ROOT)
+    if file_path != allowed_root and not file_path.startswith(allowed_root + os.sep):
+        abort(403)
+    if not os.path.isfile(file_path):
+        abort(404)
+
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=os.path.basename(file_path),
+    )
 
 
 @app.errorhandler(413)

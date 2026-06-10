@@ -52,6 +52,51 @@
 }
 
 /* ============================================================
+   App header
+   ============================================================ */
+.app-header {
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--bg-card);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.app-header-inner {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: var(--sp-3) var(--sp-6);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-4);
+}
+.app-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-weight: 600;
+    font-size: var(--fs-md);
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.15s;
+}
+.app-logo i { color: var(--primary); font-size: 1.15rem; }
+.app-logo:hover { color: var(--primary); }
+.app-version {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--faint);
+    background: var(--bg-soft);
+    border: 1px solid var(--border-soft);
+    padding: 2px var(--sp-2);
+    border-radius: var(--r-sm);
+}
+
+@media (max-width: 640px) {
+    .app-header-inner { padding: var(--sp-3) var(--sp-4); }
+}
+
+/* ============================================================
    Reset & base
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; }
@@ -609,6 +654,27 @@ input[type="file"]::file-selector-button:hover {
 .icon-success { color: #2dd47e; }
 .icon-error   { color: #f47174; }
 .cell-status  { width: 2.5rem; text-align: center; }
+.cell-action  { width: 3rem; text-align: center; }
+
+.btn-download {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--r-sm);
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    text-decoration: none;
+    font-size: var(--fs-sm);
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-download:hover {
+    background: rgba(13, 110, 253, 0.1);
+    color: var(--primary-h);
+    border-color: var(--primary);
+}
 
 /* ============================================================
    Alerts

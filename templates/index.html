@@ -4,7 +4,7 @@
 {% block content %}
 <div class="shell">
     <div class="eyebrow">Nova tarefa</div>
-    <h1 class="title-display">Video Downloader</h1>
+    <h1 class="title-display">Nova tarefa</h1>
     <p class="subtitle">
         Cole um link, envie um <span class="mono">.txt</span> ou ambos.
         Vídeos individuais, playlists ou downloads paralelos.
@@ -72,7 +72,7 @@
             <div class="field">
                 <label class="field-label">Ou cole abaixo</label>
                 <textarea name="links" class="form-control mono" rows="6"
-                          placeholder="https://www.youtube.com/watch?v=&#10;https://www.youtube.com/playlist?list="></textarea>
+                          placeholder="https://www.youtube.com/watch?v=...&#10;https://vimeo.com/123456789&#10;https://..."></textarea>
             </div>
         </div>
 
@@ -86,6 +86,21 @@
                        value="{{ default_path }}">
                 <small class="form-text">
                     Deve estar dentro da raiz permitida no servidor.
+                </small>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">05 · Cookie <span class="text-faint" style="font-weight:400;text-transform:none;letter-spacing:0">(opcional)</span></span>
+            </div>
+            <div class="field" style="margin-bottom:0">
+                <label class="field-label">Arquivo de cookies <span class="text-faint" style="font-weight:400">.txt — formato Netscape</span></label>
+                <input type="file" class="form-control" name="cookies_file" accept=".txt">
+                <small class="form-text">
+                    Necessário para sites com restrição de idade ou login.
+                    Exporte com a extensão <span class="mono">Get cookies.txt LOCALLY</span>.
+                    O arquivo é descartado ao término do job.
                 </small>
             </div>
         </div>

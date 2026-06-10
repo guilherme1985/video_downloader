@@ -61,4 +61,24 @@ Três arquivos principais:
 | `HOST_DOWNLOAD_PATH` | `/mnt/nas/Downloads` | Deve existir antes de subir o container |
 | `APP_UID` / `APP_GID` | `1000` | Deve casar com o dono de `HOST_DOWNLOAD_PATH` |
 | `MAX_JOBS_KEPT` | `50` | Pruning LRU do histórico |
-| `MAX_WORKERS` | `10` | Limite de workers paralelos por job |
+| `MAX_WORKERS` | `10` | Teto de workers por job (validado em `_validate_workers`) |
+| `DEFAULT_WORKERS` | `1` | Valor pré-preenchido no formulário |
+| `ALLOWED_DOWNLOAD_ROOT` | igual a `DEFAULT_DOWNLOAD_PATH` | Raiz de path traversal — downloads fora dessa árvore são recusados |
+| `MAX_LINKS` | `500` | Limite de links por job |
+| `MAX_UPLOAD_MB` | `1` | Tamanho máximo do arquivo `.txt` enviado pelo formulário |
+
+## Detalhes de implementação não-óbvios
+
+**Cancelamento via exceção no hook:** A única forma confiável de interromper um download em andamento no yt-dlp é levantar uma exceção de dentro do `progress_hook`. A classe `_Cancelled` em `download_videos.py` serve exclusivamente a isso — `app.py` seta `job["cancelled"] = True` e o hook levanta a exceção na próxima chamada de progresso.
+
+**Dois modos de execução paralela:** `app.py` usa `baixar_video()` (link único) diretamente em cada thread do `ThreadPoolExecutor`. `processar_links()` é uma versão sequencial usada apenas pelo modo CLI standalone (`__main__`). Não misturar os dois caminhos.
+
+**Log em disco:** `download_videos.py` grava um `download_log.txt` dentro do próprio diretório de destino a cada download iniciado/concluído/falho.
+
+**Rotas web (além da API):**
+
+| Rota | Descrição |
+|------|-----------|
+| `GET /` + `POST /` | Formulário principal; POST cria o job e redireciona |
+| `GET /status/<job_id>` | Página de acompanhamento em tempo real |
+| `GET /results/<job_id>` | Resumo final dos resultados |

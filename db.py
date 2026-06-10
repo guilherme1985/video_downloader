@@ -42,12 +42,13 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_job ON messages(job_id, id);
 
 CREATE TABLE IF NOT EXISTS results (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id  TEXT NOT NULL,
-    link    TEXT NOT NULL,
-    title   TEXT NOT NULL DEFAULT '',
-    success INTEGER NOT NULL DEFAULT 0,
-    message TEXT NOT NULL DEFAULT '',
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id    TEXT NOT NULL,
+    link      TEXT NOT NULL,
+    title     TEXT NOT NULL DEFAULT '',
+    success   INTEGER NOT NULL DEFAULT 0,
+    message   TEXT NOT NULL DEFAULT '',
+    file_path TEXT NOT NULL DEFAULT '',
     FOREIGN KEY(job_id) REFERENCES jobs(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_results_job ON results(job_id, id);
@@ -72,6 +73,13 @@ class JobStore:
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(SCHEMA)
+        # Migração v2.3: adiciona file_path se ainda não existir
+        try:
+            self._conn.execute(
+                "ALTER TABLE results ADD COLUMN file_path TEXT NOT NULL DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass
 
     # ---- Jobs ---------------------------------------------------------
 
@@ -208,12 +216,13 @@ class JobStore:
             )
 
     def add_result(self, job_id: str, link: str, title: str,
-                   success: bool, message: str = "") -> None:
+                   success: bool, message: str = "",
+                   file_path: str = "") -> None:
         with self._lock:
             self._conn.execute(
-                """INSERT INTO results(job_id, link, title, success, message)
-                   VALUES (?,?,?,?,?)""",
-                (job_id, link, title, int(success), message),
+                """INSERT INTO results(job_id, link, title, success, message, file_path)
+                   VALUES (?,?,?,?,?,?)""",
+                (job_id, link, title, int(success), message, file_path),
             )
 
     # ---- Util ---------------------------------------------------------
