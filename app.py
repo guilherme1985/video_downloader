@@ -30,7 +30,7 @@ from db import JobStore
 # ---------------------------------------------------------------------------
 # Configuração
 # ---------------------------------------------------------------------------
-APP_VERSION = "v2.3"
+APP_VERSION = "v2.4.3"
 
 DEFAULT_DOWNLOAD_PATH = os.environ.get("DEFAULT_DOWNLOAD_PATH", "/mnt/nas/Downloads")
 ALLOWED_DOWNLOAD_ROOT = os.environ.get("ALLOWED_DOWNLOAD_ROOT", DEFAULT_DOWNLOAD_PATH)

@@ -127,17 +127,20 @@ Jobs antigos continuam visíveis no histórico, mas referenciam o caminho anteri
 
 ## ⚙️ Variáveis de ambiente
 
-| Variável             | Default              | Descrição                                                  |
-|----------------------|----------------------|------------------------------------------------------------|
-| `SECRET_KEY`         | *(obrigatório)*      | Chave Flask para sessões. Gere com `openssl rand -hex 32` |
-| `HOST_DOWNLOAD_PATH` | `/mnt/nas/Downloads` | Pasta no host (vira `/mnt/nas/Downloads` no container)    |
-| `APP_UID`            | `1000`               | UID do user dentro do container                            |
-| `APP_GID`            | `1000`               | GID do user dentro do container                            |
-| `HOST_PORT`          | `5000`               | Porta exposta no host                                      |
-| `MAX_LINKS`          | `500`                | Máximo de links por job                                    |
-| `MAX_UPLOAD_MB`      | `1`                  | Tamanho máximo do `.txt` enviado                           |
-| `MAX_JOBS_KEPT`      | `20`                 | Jobs mantidos no histórico (LRU)                           |
-| `FLASK_DEBUG`        | `0`                  | `1` ativa debug — **NÃO em produção**                      |
+| Variável               | Default                       | Descrição                                                  |
+|------------------------|-------------------------------|------------------------------------------------------------|
+| `SECRET_KEY`           | *(obrigatório)*               | Chave Flask para sessões. Gere com `openssl rand -hex 32` |
+| `HOST_DOWNLOAD_PATH`   | `/mnt/nas/Downloads`          | Pasta no host (vira `/mnt/nas/Downloads` no container)    |
+| `APP_UID`              | `1000`                        | UID do user dentro do container                            |
+| `APP_GID`              | `1000`                        | GID do user dentro do container                            |
+| `HOST_PORT`            | `5000`                        | Porta exposta no host                                      |
+| `MAX_LINKS`            | `500`                         | Máximo de links por job                                    |
+| `MAX_UPLOAD_MB`        | `1`                           | Tamanho máximo do `.txt` enviado                           |
+| `MAX_JOBS_KEPT`        | `50`                          | Jobs mantidos no histórico (LRU)                           |
+| `MAX_WORKERS`          | `10`                          | Teto de workers paralelos por job                          |
+| `DEFAULT_WORKERS`      | `1`                           | Valor pré-preenchido no formulário                         |
+| `ALLOWED_DOWNLOAD_ROOT`| igual a `DEFAULT_DOWNLOAD_PATH` | Raiz para validação anti path-traversal                  |
+| `FLASK_DEBUG`          | `0`                           | `1` ativa debug — **NÃO em produção**                      |
 
 ## 🧰 Uso
 
@@ -267,3 +270,11 @@ Adicione `SECRET_KEY=$(openssl rand -hex 32)` ao `.env`.
     ├── status.html
     └── results.html
 ```
+
+---
+
+## ☕ Apoie o projeto
+
+Se este projeto te ajudou, considere me pagar um café!
+
+[![Buy Me A Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=☕&slug=guilhermeromero&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://buymeacoffee.com/guilhermeromero)
