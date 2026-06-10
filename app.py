@@ -298,6 +298,9 @@ def _run_job(job_id: str, links: list, dest_path: str,
     cb = _make_callback(job_id)
     cb({"type": "info",
         "message": f"Iniciando {len(links)} link(s) com {workers} worker(s)."})
+    if cookiefile:
+        cb({"type": "info",
+            "message": f"Cookie em uso: {os.path.basename(cookiefile)}"})
 
     executor = ThreadPoolExecutor(
         max_workers=workers,
@@ -458,6 +461,12 @@ def index():
                 path = _cookie_path(use_saved_id)
                 if os.path.isfile(path):
                     cookiefile_path = path
+                else:
+                    flash(
+                        f"Cookie '{cookie_record['name']}' não encontrado no disco. "
+                        "O download prosseguirá sem autenticação.",
+                        "warning",
+                    )
 
         # Cria + persiste + dispara
         job = _new_job(workers=workers, total_links=len(links), fmt=fmt,
