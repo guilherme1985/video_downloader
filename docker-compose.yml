@@ -9,7 +9,7 @@ services:
     ports:
       - "${HOST_PORT:-5000}:5000"
     volumes:
-      - ${HOST_DOWNLOAD_PATH:-/mnt/nas/Downloads}:/mnt/nas/Downloads
+      - /mnt/nas/Downloads:/mnt/nas/Downloads
       - vd-data:/data
     environment:
       DEFAULT_DOWNLOAD_PATH: "/mnt/nas/Downloads"
