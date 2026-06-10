@@ -376,7 +376,16 @@ input[type="file"]:focus-visible::file-selector-button {
 .btn,
 .btn-primary,
 .btn-success,
-.btn-outline-danger {
+.btn-outline-danger,
+.btn-ghost {
+    /* Neutraliza o mecanismo de CSS variables do Bootstrap 5.3:
+       .btn:hover dele aplica --bs-btn-hover-bg/color sobre os nossos estilos */
+    --bs-btn-hover-bg: transparent;
+    --bs-btn-hover-color: inherit;
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-bg: transparent;
+    --bs-btn-active-color: inherit;
+    --bs-btn-focus-shadow-rgb: 0, 0, 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;

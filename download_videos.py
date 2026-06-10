@@ -18,14 +18,16 @@ from typing import Callable, List, Optional
 import yt_dlp
 
 
-# Mapeamento de format amigável -> string de formato do yt-dlp
+# Mapeamento de format amigável -> string de formato do yt-dlp.
+# Prioriza H.264+AAC (ext=mp4/m4a) para garantir merge sem problemas de codec
+# (AV1+Opus não mergeia em MP4 sem ffmpeg compilado com suporte a AV1).
 FORMAT_MAP = {
-    "best":       "bestvideo+bestaudio/best",
-    "1080p":      "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-    "720p":       "bestvideo[height<=720]+bestaudio/best[height<=720]",
-    "480p":       "bestvideo[height<=480]+bestaudio/best[height<=480]",
-    "audio_mp3":  "bestaudio/best",
-    "audio_m4a":  "bestaudio[ext=m4a]/bestaudio/best",
+    "best":  "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+    "1080p": "bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]",
+    "720p":  "bestvideo[ext=mp4][height<=720]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]",
+    "480p":  "bestvideo[ext=mp4][height<=480]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]",
+    "audio_mp3": "bestaudio/best",
+    "audio_m4a": "bestaudio[ext=m4a]/bestaudio/best",
 }
 
 EventCallback = Callable[[dict], None]
