@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     workers      INTEGER NOT NULL DEFAULT 1,
     running      INTEGER NOT NULL DEFAULT 0,
     completed    INTEGER NOT NULL DEFAULT 0,
-    cancelled    INTEGER NOT NULL DEFAULT 0
+    cancelled    INTEGER NOT NULL DEFAULT 0,
+    cookie_id    TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -65,10 +66,11 @@ CREATE TABLE IF NOT EXISTS cookies (
 class JobStore:
     """Persistência thread-safe de jobs em SQLite."""
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, *, checkpoint_interval_s: int = 600):
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self._lock = threading.Lock()
+        self._stopped = threading.Event()
         self._conn = sqlite3.connect(
             db_path,
             check_same_thread=False,
@@ -87,6 +89,39 @@ class JobStore:
             )
         except sqlite3.OperationalError:
             pass
+        # Migração v2.4.4: adiciona cookie_id no job para suportar retry com cookie
+        try:
+            self._conn.execute(
+                "ALTER TABLE jobs ADD COLUMN cookie_id TEXT NOT NULL DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass
+
+        # Thread daemon de checkpoint WAL: evita que o arquivo -wal cresça
+        # indefinidamente em produção longa.
+        self._checkpoint_interval_s = max(0, int(checkpoint_interval_s))
+        if self._checkpoint_interval_s > 0:
+            self._checkpoint_thread = threading.Thread(
+                target=self._checkpoint_loop, daemon=True,
+                name="db-wal-checkpoint",
+            )
+            self._checkpoint_thread.start()
+
+    def _checkpoint_loop(self) -> None:
+        while not self._stopped.is_set():
+            if self._stopped.wait(self._checkpoint_interval_s):
+                return
+            try:
+                with self._lock:
+                    self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.Error:
+                # Não-crítico; tenta de novo no próximo tick.
+                pass
+
+    def ping(self) -> None:
+        """Healthcheck: levanta exceção se o DB não responder a SELECT 1."""
+        with self._lock:
+            self._conn.execute("SELECT 1").fetchone()
 
     # ---- Jobs ---------------------------------------------------------
 
@@ -94,11 +129,12 @@ class JobStore:
         with self._lock:
             self._conn.execute(
                 """INSERT INTO jobs(id, created_at, total_links, format,
-                                    is_playlist, dest_path, workers, running)
-                   VALUES (?,?,?,?,?,?,?,1)""",
+                                    is_playlist, dest_path, workers, running,
+                                    cookie_id)
+                   VALUES (?,?,?,?,?,?,?,1,?)""",
                 (job["id"], job["created_at"], job["total_links"],
                  job["format"], int(job["is_playlist"]), job["dest_path"],
-                 job["workers"]),
+                 job["workers"], job.get("cookie_id", "")),
             )
 
     def finalize_job(self, job_id: str, *, completed: bool,
@@ -118,7 +154,7 @@ class JobStore:
             # Pega os IDs primeiro para não depender de timestamp na 2ª query
             zombie_ids = [
                 row["id"] for row in self._conn.execute(
-                    "SELECT id FROM jobs WHERE running=1"
+                    "SELECT id FROM jobs WHERE running=1 AND finished_at IS NULL"
                 ).fetchall()
             ]
             if not zombie_ids:
@@ -268,5 +304,6 @@ class JobStore:
     # ---- Util ---------------------------------------------------------
 
     def close(self) -> None:
+        self._stopped.set()
         with self._lock:
             self._conn.close()

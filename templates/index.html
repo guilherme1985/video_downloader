@@ -10,7 +10,7 @@
         Vídeos individuais, playlists ou downloads paralelos.
     </p>
 
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" onsubmit="onJobSubmit(this)">
         <div class="panel">
             <div class="panel-head">
                 <span class="panel-title">01 · Tipo</span>
@@ -148,9 +148,9 @@
         </div>
 
         <div class="d-flex justify-content-end mt-4">
-            <button type="submit" class="btn btn-primary">
-                <i class="bi bi-download"></i>
-                <span>Iniciar download</span>
+            <button type="submit" class="btn btn-primary" id="btn-submit">
+                <i class="bi bi-download" id="btn-submit-icon"></i>
+                <span id="btn-submit-label">Iniciar download</span>
             </button>
         </div>
     </form>
@@ -210,6 +210,19 @@
 
 {% block scripts %}
 <script>
+// ---- Submit feedback ----------------------------------------------
+
+function onJobSubmit(form) {
+    const btn = document.getElementById('btn-submit');
+    if (!btn) return true;
+    btn.disabled = true;
+    const icon = document.getElementById('btn-submit-icon');
+    const label = document.getElementById('btn-submit-label');
+    if (icon) icon.className = 'bi bi-hourglass-split';
+    if (label) label.textContent = 'Enviando...';
+    return true;
+}
+
 // ---- Cookie helpers ------------------------------------------------
 
 function onSavedCookieSelect(id, radio) {

@@ -685,10 +685,14 @@ input[type="file"]:focus-visible::file-selector-button {
     font-family: var(--font-mono);
     font-size: var(--fs-xs);
     color: var(--muted);
-    max-width: 380px;
+    max-width: clamp(140px, 30vw, 380px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+@media (max-width: 640px) {
+    .results-table-wrap { overflow-x: auto; }
+    .url-cell { max-width: 40vw; }
 }
 
 .icon-success { color: #2dd47e; }

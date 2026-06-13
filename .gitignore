@@ -1,1 +1,27 @@
+# Segredos / configuração local
 .env
+.env.local
+
+# Roadmap interno (uso pessoal, não publicar)
+roadmap.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Claude Code — manter só os commands compartilhados; settings local é por máquina
+.claude/settings.local.json
+
+# Logs locais
+*.log

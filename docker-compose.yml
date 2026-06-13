@@ -9,7 +9,7 @@ services:
     ports:
       - "${HOST_PORT:-5000}:5000"
     volumes:
-      - /mnt/nas/Downloads:/mnt/nas/Downloads
+      - ${HOST_DOWNLOAD_PATH:-/mnt/nas/Downloads}:/mnt/nas/Downloads
       - vd-data:/data
     environment:
       DEFAULT_DOWNLOAD_PATH: "/mnt/nas/Downloads"
@@ -21,6 +21,10 @@ services:
       MAX_JOBS_KEPT: "${MAX_JOBS_KEPT:-50}"
       MAX_WORKERS: "${MAX_WORKERS:-10}"
       DEFAULT_WORKERS: "${DEFAULT_WORKERS:-1}"
+      MAX_FILESIZE_MB: "${MAX_FILESIZE_MB:-0}"
+      JOB_MAX_RUNTIME_S: "${JOB_MAX_RUNTIME_S:-21600}"
+      WEBHOOK_URL: "${WEBHOOK_URL:-}"
+      WEBHOOK_TIMEOUT_S: "${WEBHOOK_TIMEOUT_S:-5}"
       FLASK_DEBUG: "0"
     restart: unless-stopped
 

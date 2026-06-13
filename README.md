@@ -139,6 +139,10 @@ Jobs antigos continuam visíveis no histórico, mas referenciam o caminho anteri
 | `MAX_JOBS_KEPT`        | `50`                          | Jobs mantidos no histórico (LRU)                           |
 | `MAX_WORKERS`          | `10`                          | Teto de workers paralelos por job                          |
 | `DEFAULT_WORKERS`      | `1`                           | Valor pré-preenchido no formulário                         |
+| `MAX_FILESIZE_MB`      | `0`                           | Tamanho máximo por vídeo em MB; `0` = sem limite           |
+| `JOB_MAX_RUNTIME_S`    | `21600`                       | Tempo máximo por job em segundos (6 h). `0` = sem limite   |
+| `WEBHOOK_URL`          | *(vazio)*                     | POST JSON ao concluir job (Discord/Slack/ntfy etc.)        |
+| `WEBHOOK_TIMEOUT_S`    | `5`                           | Timeout do POST do webhook em segundos                     |
 | `ALLOWED_DOWNLOAD_ROOT`| igual a `DEFAULT_DOWNLOAD_PATH` | Raiz para validação anti path-traversal                  |
 | `FLASK_DEBUG`          | `0`                           | `1` ativa debug — **NÃO em produção**                      |
 
@@ -162,6 +166,16 @@ python download_videos.py links.txt /caminho/destino video audio_mp3
 Eventos saem como JSON (uma linha por evento) no stdout.
 
 ## 🛠️ Manutenção
+
+### Healthcheck
+
+```bash
+curl -fsS http://localhost:5000/healthz
+# {"ok":true,"version":"v2.5.1"}
+```
+
+O endpoint valida Flask + acesso ao SQLite. É o mesmo usado pelo
+`HEALTHCHECK` do Docker.
 
 ### Atualizar `yt-dlp`
 
@@ -214,6 +228,21 @@ Adicione `SECRET_KEY=$(openssl rand -hex 32)` ao `.env`.
 - Modo debug desligado por padrão
 
 ## 📋 Changelog
+
+### v2.5.1
+- **Timeout por job** (`JOB_MAX_RUNTIME_S`, default 6 h): jobs que ultrapassam o deadline são marcados como cancelados automaticamente, com mensagem específica no log de eventos. `0` desativa o limite.
+- **Webhook ao concluir** (`WEBHOOK_URL`): POST JSON best-effort com `{job_id, status, total_links, success_count, fail_count, duration_s, ...}` ao final de cada job. `status` pode ser `completed`, `cancelled` ou `timeout`. Falhas no webhook nunca quebram o job.
+
+### v2.5.0
+- **Robustez**: snapshot consistente sob lock para `active/messages/results` (elimina `RuntimeError: dictionary changed size during iteration` em jobs paralelos).
+- **Cookies**: yt-dlp agora opera numa cópia tmp do cookie; cookies salvos pelo usuário nunca são sobrescritos.
+- **Retry**: nova coluna `jobs.cookie_id` — retentativas preservam o cookie do job original (migração automática).
+- **Cancelamento**: passa a interromper a etapa de `extract_info` (não só o download), reduzindo latência do cancel em playlists grandes.
+- **Hardening**: headers de segurança (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy); bloqueio de IPs privados/loopback/link-local nos links submetidos (defesa SSRF).
+- **Operação**: thread de checkpoint WAL periódico (10 min); endpoint `/healthz` que valida DB; `HEALTHCHECK` do Docker passa a usar `/healthz`.
+- **Limites**: nova variável `MAX_FILESIZE_MB` repassada ao yt-dlp como `max_filesize`.
+- **UX**: `<noscript>` informativo; spinner ao submeter formulário; tabela de resultados responsiva em mobile; correção de `colspan` na linha vazia.
+- **Manutenção**: Bootstrap atualizado para `5.3.3` stable e Bootstrap Icons `1.11.3`.
 
 ### v2.4.3
 - **Correção visual dos botões "Escolher arquivo"**: Bootstrap 5.3 sobrescrevia o estilo do `::file-selector-button` no hover via regra de alta especificidade (`--bs-secondary-bg`). Corrigido adicionando seletores equivalentes com `.form-control[type="file"]` que vencem no empate de cascata.

@@ -65,6 +65,7 @@ def _build_ydl_opts(
     is_playlist: bool,
     cookiefile: Optional[str] = None,
     file_tracker: Optional[list] = None,
+    max_filesize_mb: int = 0,
 ) -> dict:
     """Monta opções do yt-dlp incluindo o progress_hook."""
 
@@ -129,6 +130,9 @@ def _build_ydl_opts(
     if cookiefile:
         opts["cookiefile"] = cookiefile
 
+    if max_filesize_mb and max_filesize_mb > 0:
+        opts["max_filesize"] = max_filesize_mb * 1024 * 1024
+
     if file_tracker is not None:
         def _pp_hook(d):
             if d.get("status") == "finished":
@@ -152,6 +156,7 @@ def baixar_video(
     on_event: Optional[EventCallback] = None,
     is_cancelled: Optional[CancelChecker] = None,
     cookiefile: Optional[str] = None,
+    max_filesize_mb: int = 0,
 ) -> dict:
     """
     Baixa um único link (vídeo ou playlist).
@@ -168,10 +173,16 @@ def baixar_video(
         is_playlist=is_playlist,
         cookiefile=cookiefile,
         file_tracker=file_tracker,
+        max_filesize_mb=max_filesize_mb,
     )
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(link, download=False)
+
+            # Cancelamento solicitado durante o extract_info (etapa que NÃO
+            # dispara progress_hook, especialmente lenta para playlists).
+            if is_cancelled and is_cancelled():
+                raise _Cancelled()
 
             if is_playlist and isinstance(info, dict) and "entries" in info:
                 playlist_title = info.get("title") or "Playlist"

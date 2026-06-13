@@ -33,7 +33,7 @@ EXPOSE 5000
 
 # Healthcheck simples
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -fsS http://localhost:5000/ -o /dev/null || exit 1
+    CMD curl -fsS http://localhost:5000/healthz -o /dev/null || exit 1
 
 # Sobe via gunicorn (1 worker porque o estado de jobs é em memória; threads
 # permitem múltiplas requests concorrentes). Debug é controlado via env.
